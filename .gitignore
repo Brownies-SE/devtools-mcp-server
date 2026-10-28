@@ -1,3 +1,13 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.superpowers/
+.worktrees/
+*.egg-info/
+dist/
+build/
 
 # Local secrets must never be published.
 .env
