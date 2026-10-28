@@ -22,7 +22,12 @@ async def test_stdio_environment_tool():
         ):
             await session.initialize()
             tools = await session.list_tools()
-            assert {t.name for t in tools.tools} == {"environment_info"}
+            assert {t.name for t in tools.tools} == {
+                "environment_info",
+                "files_list",
+                "files_read",
+                "files_search",
+            }
             result = await session.call_tool("environment_info", {})
             assert not result.is_error
             assert result.structured_content["status"] == "ok"
