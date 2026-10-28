@@ -22,6 +22,7 @@ _GIT_COMMANDS = {
     "check-ignore",
     "hash-object",
     "check-attr",
+    "config",
 }
 _ENV_KEYS = ("PATH", "HOME", "USERPROFILE", "SystemRoot", "WINDIR", "TEMP", "TMP", "TMPDIR")
 
@@ -83,6 +84,16 @@ def run_command(
             raise InspectionError(
                 "INVALID_ARGUMENT", "Git write or conversion options are forbidden."
             )
+        if remaining[0] == "config" and remaining != [
+            "config",
+            "--file=" + str(ctx.scratch_dir / "raw-config"),
+            "--no-includes",
+            "--null",
+            "--list",
+        ]:
+            raise InspectionError(
+                "INVALID_ARGUMENT", "Only private no-include config parsing is allowed."
+            )
         if remaining[0] == "symbolic-ref" and [
             arg for arg in remaining[1:] if not arg.startswith("-")
         ] != ["HEAD"]:
@@ -116,6 +127,10 @@ def run_command(
                 "GIT_LITERAL_PATHSPECS": "1",
             }
         )
+        # check-ignore accepts literal filenames, not Git pathspecs, and rejects
+        # the implicit literal magic added by GIT_LITERAL_PATHSPECS.
+        if remaining[0] == "check-ignore":
+            env.pop("GIT_LITERAL_PATHSPECS", None)
         prefix = [
             "--no-pager",
             "--no-optional-locks",

@@ -93,7 +93,7 @@ class VerifiedTextFile:
     def __exit__(self, *args):
         self.proof.close()
 
-    def read_utf8(self) -> str:
+    def read_bytes(self) -> bytes:
         self.proof.verify()
         if self.proof.initial.st_size > 1048576:
             raise InspectionError("OUTPUT_LIMIT", "File exceeds the 1 MiB source limit.")
@@ -103,6 +103,10 @@ class VerifiedTextFile:
             self.ctx.budget.consume("file_scan", len(chunk), source=source)
             buffer.extend(chunk)
         self.proof.verify()
+        return bytes(buffer)
+
+    def read_utf8(self) -> str:
+        buffer = self.read_bytes()
         if b"\0" in buffer:
             raise InspectionError("UNSUPPORTED", "Binary source files are not returned.")
         try:
@@ -283,15 +287,34 @@ class PathPolicy:
 
             raise map_os_error(error) from None
 
-    def iter_entries(self, directory: str, recursive: bool, ctx: InspectionContext):
-        resolved, aliases = self._canonical(directory)
-        root = self._open(resolved, aliases, ctx, directory=True)
+    def iter_entries(
+        self,
+        directory: str,
+        recursive: bool,
+        ctx: InspectionContext,
+        *,
+        metadata=False,
+        skip_generated=True,
+    ):
+        resolved, aliases = self._canonical(directory, metadata=metadata)
+        root = self._open(resolved, aliases, ctx, directory=True, metadata=metadata)
         try:
-            yield from self._walk(root, resolved, root.initial.st_dev, recursive, ctx)
+            yield from self._walk(
+                root, resolved, root.initial.st_dev, recursive, ctx, metadata, skip_generated
+            )
         finally:
             root.close()
 
-    def _walk(self, proof, root: Path, device: int, recursive: bool, ctx):
+    def _walk(
+        self,
+        proof,
+        root: Path,
+        device: int,
+        recursive: bool,
+        ctx,
+        metadata=False,
+        skip_generated=True,
+    ):
         proof.verify()
         with os.scandir(str(proof.path) if os.name == "nt" else proof.fd) as entries:
             for entry in entries:
@@ -300,7 +323,7 @@ class PathPolicy:
                     raise InspectionError("TIMEOUT", "File traversal timed out.")
                 child = proof.path / entry.name
                 try:
-                    self.deny(child)
+                    self.deny(child, metadata=metadata)
                     self._mount_hint(child)
                 except InspectionError:
                     continue
@@ -313,12 +336,12 @@ class PathPolicy:
                 is_dir = stat.S_ISDIR(info.st_mode) and not alias
                 if alias:
                     try:
-                        self._canonical(str(child))
+                        self._canonical(str(child), metadata=metadata)
                     except InspectionError, OSError:
                         continue
                 if not (stat.S_ISREG(info.st_mode) or is_dir or alias):
                     continue
-                if entry.name in _SKIP and recursive:
+                if entry.name == ".git" or skip_generated and entry.name in _SKIP and recursive:
                     continue
                 proof.verify()
                 yield VerifiedEntry(
@@ -329,9 +352,49 @@ class PathPolicy:
                     info.st_mtime,
                 )
                 if recursive and is_dir and info.st_dev == device:
-                    opened = self._open(child, [], ctx, directory=True)
+                    opened = self._open(child, [], ctx, directory=True, metadata=metadata)
                     try:
-                        yield from self._walk(opened, root, device, recursive, ctx)
+                        yield from self._walk(
+                            opened, root, device, recursive, ctx, metadata, skip_generated
+                        )
                     finally:
                         opened.close()
         proof.verify()
+
+
+def read_git_metadata(repository: str, relative_key: str, ctx: InspectionContext) -> bytes:
+    import re
+
+    from .platforms.posix import map_os_error
+
+    permitted = {
+        ".git",
+        ".gitconfig",
+        "config",
+        "config.worktree",
+        "index",
+        "HEAD",
+        "commondir",
+        "packed-refs",
+        "shallow",
+        "info/exclude",
+        "info/attributes",
+        "objects/info/alternates",
+        "info/alternates",
+        "info/http-alternates",
+        "objects/info/http-alternates",
+    }
+    if relative_key not in permitted and not re.fullmatch(
+        r"refs/(?:heads|tags|remotes)/[^\x00-\x20~^:?*\\]+", relative_key
+    ):
+        raise InspectionError("INVALID_ARGUMENT", "Git metadata key is not permitted.")
+    if ".." in Path(relative_key).parts or Path(relative_key).is_absolute():
+        raise InspectionError("INVALID_ARGUMENT", "Git metadata key is not permitted.")
+    policy = PathPolicy(ctx.config)
+    try:
+        resolved, aliases = policy._canonical(str(Path(repository) / relative_key), metadata=True)
+        proof = policy._open(resolved, aliases, ctx, metadata=True)
+        with VerifiedTextFile(proof, ctx) as source:
+            return source.read_bytes()
+    except OSError as error:
+        raise map_os_error(error) from None
