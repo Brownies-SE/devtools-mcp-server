@@ -330,9 +330,17 @@ class PathPolicy:
                 info = entry.stat(follow_symlinks=False)
                 if getattr(info, "st_flags", 0) & 0x40000000:
                     continue
-                alias = stat.S_ISLNK(info.st_mode) or bool(
-                    getattr(info, "st_file_attributes", 0) & 0x400
-                )
+                attributes = getattr(info, "st_file_attributes", 0)
+                tag = getattr(info, "st_reparse_tag", 0)
+                if attributes & (0x1000 | 0x40000 | 0x400000):
+                    continue
+                if (
+                    attributes & 0x400
+                    and tag not in {0xA0000003, 0xA000000C}
+                    and tag & ~0xF000 != 0x9000001A
+                ):
+                    continue
+                alias = stat.S_ISLNK(info.st_mode) or tag in {0xA0000003, 0xA000000C}
                 is_dir = stat.S_ISDIR(info.st_mode) and not alias
                 if alias:
                     try:
@@ -351,9 +359,11 @@ class PathPolicy:
                     info.st_size,
                     info.st_mtime,
                 )
-                if recursive and is_dir and info.st_dev == device:
+                if recursive and is_dir:
                     opened = self._open(child, [], ctx, directory=True, metadata=metadata)
                     try:
+                        if opened.initial.st_dev != device:
+                            continue
                         yield from self._walk(
                             opened, root, device, recursive, ctx, metadata, skip_generated
                         )

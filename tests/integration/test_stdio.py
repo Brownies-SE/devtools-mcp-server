@@ -33,6 +33,7 @@ async def test_stdio_environment_tool():
                 "git_status",
                 "git_branches",
                 "git_log",
+                "git_diff",
             }
             result = await session.call_tool("environment_info", {})
             assert not result.is_error

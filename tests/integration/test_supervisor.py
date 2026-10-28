@@ -109,7 +109,8 @@ async def test_cancellation_during_launch_does_not_orphan_worker(monkeypatch, tm
     monkeypatch.setattr(supervisor, "start_owned_worker", delayed)
     call = asyncio.create_task(instance.call("environment_info", {}))
     try:
-        await started.wait()
+        async with asyncio.timeout(5):
+            await started.wait()
         call.cancel()
         with pytest.raises(asyncio.CancelledError):
             await call

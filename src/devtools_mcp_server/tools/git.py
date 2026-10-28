@@ -8,14 +8,17 @@ import stat
 from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from difflib import unified_diff
 from pathlib import Path
+from typing import Annotated, Literal
 
-from pydantic import Field
+from pydantic import Field, StringConstraints, field_validator, model_validator
 
 from ..execution import run_command
 from ..models import InspectionError, PageArgs, Reply, StrictModel, Warning
 from ..pagination import PagePosition, decode_cursor, encode_cursor, page
 from ..paths import PathPolicy, VerifiedTextFile, read_git_metadata
+from ..redaction import sanitize_text
 
 
 class GitStatusArgs(StrictModel):
@@ -139,7 +142,8 @@ class GitReadView:
                     raise _error()
                 target = Path(pointer[8:])
                 self.storage = target if target.is_absolute() else self.worktree / target
-                self.location(self.storage)
+                self.policy.deny(self.storage, metadata=True)
+                self.storage = self.location(Path(os.path.normpath(str(self.storage)))).path
             common = self.maybe(self.storage, "commondir")
             self.common = self.storage
             if common is not None:
@@ -148,7 +152,8 @@ class GitReadView:
                     raise _error()
                 target = Path(value)
                 self.common = target if target.is_absolute() else self.storage / target
-                self.common = self.location(self.common).path
+                self.policy.deny(self.common, metadata=True)
+                self.common = self.location(Path(os.path.normpath(str(self.common)))).path
             self.metadata_dir.mkdir()
             self.ignore_tree.mkdir()
             self.stack.callback(shutil.rmtree, self.metadata_dir)
@@ -198,8 +203,7 @@ class GitReadView:
             ):
                 raise _error(message="Repository object or ref format is unsupported.")
             self.conversion_unknown = any(
-                key.startswith(("filter.", "include.", "includeif."))
-                or key in {"core.attributesfile", "core.eol", "core.safecrlf"}
+                key.startswith(("include.", "includeif.")) or key == "core.attributesfile"
                 for key in self.config
             ) or self.config.get("core.autocrlf", "false").lower() not in {
                 "false",
@@ -453,6 +457,8 @@ class GitReadView:
         ), raw
 
     def untracked(self, index):
+        if self.maybe(self.common, "info/attributes"):
+            self.conversion_unknown = True
         candidates = []
         for entry in self.policy.iter_entries(
             str(self.worktree), True, self.ctx, skip_generated=False
@@ -467,7 +473,7 @@ class GitReadView:
                     content = source.read_utf8()
                 target = self.ignore_tree / name
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(content, encoding="utf-8")
+                target.write_text(content, encoding="utf-8", newline="\n")
             if name not in index:
                 candidates.append(name)
         excludes = self.config.get("core.excludesfile")
@@ -479,7 +485,7 @@ class GitReadView:
                 with self.policy.open_text(str(source_path), self.ctx) as source:
                     content = source.read_utf8()
                 target = self.ctx.scratch_dir / "safe-excludes"
-                target.write_text(content, encoding="utf-8")
+                target.write_text(content, encoding="utf-8", newline="\n")
                 with (self.metadata_dir / "config").open("a", encoding="utf-8") as config:
                     config.write(
                         "[core]\nexcludesFile = "
@@ -629,3 +635,183 @@ def git_log(args: GitLogArgs, ctx) -> Reply[GitLogData]:
             else None
         )
         return Reply[GitLogData](data=GitLogData(commits=commits[: args.limit]), next_cursor=cursor)
+
+
+class GitDiffArgs(GitStatusArgs):
+    mode: Literal["working", "staged", "commit"] = "working"
+    revision: str | None = Field(default=None, min_length=1, max_length=256)
+    paths: list[Annotated[str, StringConstraints(min_length=1, max_length=4096)]] | None = Field(
+        default=None, max_length=100
+    )
+
+    @field_validator("paths")
+    @classmethod
+    def literal_paths(cls, paths):
+        for value in paths or []:
+            if (
+                value.startswith(("/", "-"))
+                or ":" in value
+                or "\\" in value
+                or "\0" in value
+                or ".." in value.split("/")
+            ):
+                raise ValueError("Path filters must be literal repository-relative paths.")
+        return paths
+
+    @model_validator(mode="after")
+    def revision_matches_mode(self):
+        if (self.mode == "commit") != (self.revision is not None):
+            raise ValueError("Revision is required only for commit comparisons.")
+        if self.revision is not None:
+            try:
+                _revision(self.revision)
+            except InspectionError:
+                raise ValueError("Only literal local revisions are permitted.") from None
+        return self
+
+
+class GitFileDiff(StrictModel):
+    old_path: str | None
+    new_path: str | None
+    patch: str
+
+
+class GitDiffData(StrictModel):
+    files: list[GitFileDiff]
+
+
+def _blob(view, item):
+    if item is None:
+        return b""
+    if item.mode not in {"100644", "100755"}:
+        raise _error(message="Symlink and submodule patch bodies are not exposed.")
+    capture = view.command("cat-file", "blob", item.oid, capture="git_blob")
+    if capture.returncode:
+        raise _error("UNAVAILABLE", "A required source blob is not available locally.")
+    return capture.stdout
+
+
+def _diff_sources(raw):
+    if b"\0" in raw:
+        raise _error(message="Binary patch bodies are not exposed.")
+    return sanitize_text(_text(raw))
+
+
+def _comparison_pairs(old, new):
+    deleted = set(old) - set(new)
+    added = set(new) - set(old)
+    pairs, associated = [], set()
+    by_identity = {}
+    for path in sorted(deleted):
+        by_identity.setdefault(old[path], []).append(path)
+    for path in sorted(added):
+        matches = by_identity.get(new[path], [])
+        if matches:
+            previous = matches.pop(0)
+            associated.update((path, previous))
+            pairs.append((previous, path))
+    pairs.extend(
+        (path if path in old else None, path if path in new else None)
+        for path in sorted(set(old) | set(new))
+        if path not in associated and old.get(path) != new.get(path)
+    )
+    return pairs
+
+
+def git_diff(args: GitDiffArgs, ctx) -> Reply[GitDiffData]:
+    files, omitted, redacted = [], 0, False
+    with open_git_view(args.repository, ctx) as view:
+        working_raw = {}
+        if args.mode == "staged":
+            old, new = view.tree(view.commit("HEAD", unborn=True)), view.index()
+        elif args.mode == "commit":
+            commit = view.commit(args.revision)
+            capture = view.command("log", "-1", "--no-show-signature", "--format=%P", commit, "--")
+            if capture.returncode:
+                raise _error("UNAVAILABLE", "Parent commit metadata is unavailable.")
+            parents = _text(capture.stdout).strip().split()
+            old, new = view.tree(parents[0] if parents else None), view.tree(commit)
+        else:
+            old = view.index()
+            new = dict(old)
+            # Inspect attributes/ignore metadata through the same safe scanner;
+            # working comparisons never ask Git to read the original worktree.
+            view.untracked(old)
+            for path, item in old.items():
+                if not view.allowed(path):
+                    omitted += 1
+                    continue
+                if item.mode not in {"100644", "100755"} or view.conversion_unknown:
+                    omitted += 1
+                    view.warning(
+                        message="Some working patch sources require unsupported conversion or provenance."
+                    )
+                    continue
+                try:
+                    new[path], working_raw[path] = view.working(path)
+                except FileNotFoundError:
+                    new.pop(path, None)
+                except InspectionError as error:
+                    omitted += 1
+                    view.warning(
+                        error.code, "Some working patch sources cannot be inspected safely."
+                    )
+        pairs = _comparison_pairs(old, new)
+        # When a denied deletion could be a modified rename, the old contents
+        # cannot be read to establish similarity. Omit ambiguous additions.
+        denied_deletions = {path for path in old.keys() - new.keys() if not view.allowed(path)}
+        denied_identities = {old[path].oid for path in denied_deletions}
+        for old_path, new_path in pairs:
+            if new_path is not None and new[new_path].oid in denied_identities:
+                omitted += 1
+                continue
+            if (
+                any(path is not None and not view.allowed(path) for path in (old_path, new_path))
+                or old_path is None
+                and denied_deletions
+            ):
+                omitted += 1
+                continue
+            if args.paths is not None and not any(
+                path is not None
+                and any(
+                    path == query or path.startswith(query.rstrip("/") + "/")
+                    for query in args.paths
+                )
+                for path in (old_path, new_path)
+            ):
+                continue
+            before = old.get(old_path)
+            after = new.get(new_path)
+            try:
+                old_text = _diff_sources(_blob(view, before))
+                new_text = _diff_sources(
+                    working_raw[new_path]
+                    if args.mode == "working" and new_path is not None
+                    else _blob(view, after)
+                )
+                redacted |= old_text.redacted or new_text.redacted
+                patch = "".join(
+                    unified_diff(
+                        old_text.text.splitlines(keepends=True),
+                        new_text.text.splitlines(keepends=True),
+                        fromfile=old_path or "/dev/null",
+                        tofile=new_path or "/dev/null",
+                    )
+                )
+                files.append(GitFileDiff(old_path=old_path, new_path=new_path, patch=patch))
+            except InspectionError as error:
+                omitted += 1
+                view.warning(error.code, "Some comparison sources cannot be inspected safely.")
+        if omitted:
+            view.warning(
+                "SECRET_BLOCKED",
+                "Protected or unverified changes were omitted; the comparison is incomplete.",
+            )
+        return Reply[GitDiffData](
+            data=GitDiffData(files=files),
+            status="partial" if view.warnings else "ok",
+            warnings=view.warnings,
+            redacted=redacted,
+            omitted_count=omitted,
+        )

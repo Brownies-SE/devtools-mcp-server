@@ -206,3 +206,16 @@ def test_nested_alternate_store_cannot_hide_remote_storage(
     (repo / ".git" / "objects" / "info" / "alternates").write_text(str(alternate) + "\n")
     with pytest.raises(InspectionError), m.open_git_view(str(repo), inspection_context):
         pass
+
+
+def test_unused_filter_and_eol_settings_do_not_hide_changes(unborn_repository, inspection_context):
+    m = module()
+    repo = unborn_repository
+    commit(repo)
+    git(repo, "config", "filter.unused.clean", "this-command-must-not-run")
+    git(repo, "config", "core.safecrlf", "false")
+    git(repo, "config", "core.eol", "lf")
+    (repo / "app.py").write_text("changed\n", newline="\n")
+    reply = m.git_status(m.GitStatusArgs(repository=str(repo)), inspection_context)
+    assert "app.py" in reply.data.unstaged
+    assert "app.py" not in reply.data.unknown
