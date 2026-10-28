@@ -1,0 +1,37 @@
+name: Branch policy
+
+on:
+  pull_request:
+    branches: [dev, main]
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Branch policy
+    runs-on: ubuntu-latest
+    env:
+      PR_BASE: ${{ github.base_ref }}
+      PR_HEAD: ${{ github.head_ref }}
+      PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+      THIS_REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Validate pull request direction
+        shell: bash
+        run: |
+          if [[ "$PR_BASE" == "main" ]]; then
+            if [[ "$PR_HEAD" != "dev" || "$PR_HEAD_REPOSITORY" != "$THIS_REPOSITORY" ]]; then
+              echo "::error::Release pull requests to main must come from this repository's dev branch."
+              exit 1
+            fi
+          elif [[ "$PR_BASE" == "dev" ]]; then
+            if [[ "$PR_HEAD" == "main" || "$PR_HEAD" == "dev" ]]; then
+              echo "::error::Changes to dev must come from a separate topic branch."
+              exit 1
+            fi
+          else
+            echo "::error::Unexpected target branch."
+            exit 1
+          fi
