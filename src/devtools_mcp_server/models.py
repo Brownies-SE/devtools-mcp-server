@@ -84,6 +84,25 @@ class CaptureBudget:
     sources: dict[tuple[str, str], int] = field(default_factory=dict)
     entries: int = 0
 
+    def consume(self, channel: str, amount: int, *, source: str | None = None) -> None:
+        if amount < 0 or channel not in {"ordinary", "git_blob", "file_scan"}:
+            raise InspectionError("INVALID_ARGUMENT", "Invalid capture accounting operation.")
+        if channel != "ordinary" and source is None:
+            raise InspectionError("INVALID_ARGUMENT", "A source identity is required.")
+        total = self.totals.get(channel, 0) + amount
+        source_total = self.sources.get((channel, source), 0) + amount
+        maximum = 1048576 if channel == "ordinary" else 20 * 1048576
+        if total > maximum or (source is not None and source_total > 1048576):
+            raise InspectionError("OUTPUT_LIMIT", "Inspection capture limit reached.")
+        self.totals[channel] = total
+        if source is not None:
+            self.sources[(channel, source)] = source_total
+
+    def visit_entry(self) -> None:
+        if self.entries >= 10000:
+            raise InspectionError("OUTPUT_LIMIT", "Traversal entry limit reached.")
+        self.entries += 1
+
 
 @dataclass
 class InspectionContext:

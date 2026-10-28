@@ -1,4 +1,3 @@
-import json
 import logging
 import time
 from pathlib import Path
@@ -19,6 +18,7 @@ from .models import (
     StartupConfig,
     ToolError,
 )
+from .results import SafeSendStream, to_mcp_result
 from .tools import definitions
 
 
@@ -60,12 +60,7 @@ def create_server(config: StartupConfig) -> Server:
             reply = Reply[tool.data_model](
                 status="error", error=ToolError(code=error.code, message=error.message)
             )
-        data = reply.model_dump(mode="json")
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text=json.dumps(data, ensure_ascii=False))],
-            structured_content=data,
-            is_error=reply.status == "error",
-        )
+        return to_mcp_result(reply)
 
     server = Server(
         "devtools-mcp-server",
@@ -82,7 +77,7 @@ async def run_stdio(config: StartupConfig) -> None:
     logging.getLogger().addHandler(logging.NullHandler())
     server = create_server(config)
     async with stdio_server() as (read, write):
-        await server.run(read, write, server.create_initialization_options())
+        await server.run(read, SafeSendStream(write), server.create_initialization_options())
 
 
 def main() -> None:
