@@ -17,6 +17,7 @@ from .models import (
 )
 from .results import to_mcp_result
 from .tools import definitions
+from .tools.docker import select_local_endpoint
 
 
 def main() -> None:
@@ -27,11 +28,32 @@ def main() -> None:
         return
     request = json.loads(raw)
     if request.get("operation") == "bootstrap":
+        values = request["config"]
+        config = StartupConfig(
+            tuple(values["extra_secret_paths"]),
+            tuple(values["extra_health_paths"]),
+            values["docker_endpoint"],
+        )
+        endpoint, docker_error = None, None
+        try:
+            endpoint = select_local_endpoint(config)
+        except InspectionError as error:
+            docker_error = {"code": error.code, "message": error.message}
+        except PermissionError:
+            docker_error = {
+                "code": "ACCESS_DENIED",
+                "message": "Local Docker endpoint access was denied.",
+            }
+        except OSError:
+            docker_error = {
+                "code": "UNAVAILABLE",
+                "message": "Local Docker endpoint cannot be verified.",
+            }
         output = {
             "git_executable": resolve_executable("git"),
             "docker_executable": resolve_executable("docker"),
-            "docker_endpoint": None,
-            "docker_error": None,
+            "docker_endpoint": endpoint,
+            "docker_error": docker_error,
         }
     else:
         registry = {tool.name: tool for tool in definitions()}

@@ -69,4 +69,6 @@ async def run_stdio(config: StartupConfig) -> None:
 
 
 def main() -> None:
-    anyio.run(run_stdio, StartupConfig())
+    from .config import parse_args
+
+    anyio.run(run_stdio, parse_args())

@@ -34,6 +34,9 @@ async def test_stdio_environment_tool():
                 "git_branches",
                 "git_log",
                 "git_diff",
+                "docker_containers",
+                "docker_inspect",
+                "docker_logs",
             }
             result = await session.call_tool("environment_info", {})
             assert not result.is_error

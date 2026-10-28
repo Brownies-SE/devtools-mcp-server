@@ -224,7 +224,7 @@ class GitReadView:
             (self.metadata_dir / "config").write_text(config, encoding="utf-8")
             stores = self.verify_store(self.common / "objects", set())
             (self.metadata_dir / "objects" / "info" / "alternates").write_text(
-                "\n".join(path.as_posix() for path in stores) + "\n", encoding="utf-8"
+                "\n".join(path.as_posix() for path in stores) + "\n", encoding="utf-8", newline="\n"
             )
             self.verify()
             return self

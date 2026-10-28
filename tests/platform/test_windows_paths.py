@@ -136,3 +136,19 @@ def test_mapped_remote_drive_denied_before_open(tmp_path, inspection_context, mo
     with pytest.raises(InspectionError) as error:
         PathPolicy(StartupConfig()).open_text(str(source), inspection_context)
     assert error.value.code == "UNSUPPORTED"
+
+
+def test_directory_listing_uses_verified_handle(tmp_path, inspection_context, monkeypatch):
+    directory = tmp_path / "project"
+    (directory / "nested").mkdir(parents=True)
+    (directory / "nested" / "app.py").write_text("safe")
+
+    def raw_directory_reopen(*args, **kwargs):
+        raise AssertionError("Directory enumeration reopened an unverified pathname")
+
+    with monkeypatch.context() as context:
+        context.setattr(os, "scandir", raw_directory_reopen)
+        entries = list(
+            PathPolicy(StartupConfig()).iter_entries(str(directory), True, inspection_context)
+        )
+    assert "nested/app.py" in [entry.relative_path for entry in entries]
