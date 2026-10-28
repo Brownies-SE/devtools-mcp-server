@@ -27,6 +27,9 @@ async def test_stdio_environment_tool():
                 "files_list",
                 "files_read",
                 "files_search",
+                "processes_list",
+                "ports_list",
+                "system_stats",
             }
             result = await session.call_tool("environment_info", {})
             assert not result.is_error

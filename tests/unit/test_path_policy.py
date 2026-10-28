@@ -43,7 +43,7 @@ def test_known_secret_sources_are_denied_before_read(relative, tmp_path, inspect
 @pytest.mark.parametrize("name", ["package.json", "tsconfig.json", ".environment.py", "app.py"])
 def test_ordinary_sources_remain_readable(name, tmp_path, inspection_context):
     source = tmp_path / name
-    source.write_text("ordinary development text\n")
+    source.write_text("ordinary development text\n", encoding="utf-8", newline="\n")
     with policy().open_text(str(source), inspection_context) as opened:
         assert opened.read_utf8() == "ordinary development text\n"
 

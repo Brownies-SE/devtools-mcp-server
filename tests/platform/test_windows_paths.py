@@ -78,3 +78,61 @@ def test_unknown_locality_denied(tmp_path, inspection_context, monkeypatch):
     with pytest.raises(InspectionError) as error:
         PathPolicy(StartupConfig()).open_text(str(source), inspection_context)
     assert error.value.code == "UNSUPPORTED"
+
+
+def test_junction_replacement_before_read_is_denied(tmp_path, inspection_context, monkeypatch):
+    safe = tmp_path / "safe"
+    safe.mkdir()
+    (safe / "app.py").write_text("safe")
+    other = tmp_path / "other"
+    other.mkdir()
+    (other / "app.py").write_text("replacement must not be read")
+    alias = tmp_path / "alias"
+    junction(alias, safe)
+    with PathPolicy(StartupConfig()).open_text(str(alias / "app.py"), inspection_context) as opened:
+        os.rmdir(alias)
+        junction(alias, other)
+
+        def unexpected_read(*args):
+            raise AssertionError("Source read before alias revalidation")
+
+        monkeypatch.setattr(os, "read", unexpected_read)
+        with pytest.raises(InspectionError) as error:
+            opened.read_utf8()
+        assert error.value.code == "ACCESS_DENIED"
+
+
+def test_offline_placeholder_rejected_before_read(tmp_path, inspection_context, monkeypatch):
+    import ctypes
+    from ctypes import wintypes
+
+    source = tmp_path / "offline.py"
+    source.write_text("must not be hydrated")
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    function = kernel.SetFileAttributesW
+    function.argtypes = [wintypes.LPCWSTR, wintypes.DWORD]
+    function.restype = wintypes.BOOL
+    assert function(str(source), 0x1000)
+    try:
+
+        def unexpected_read(*args):
+            raise AssertionError("Placeholder data read")
+
+        monkeypatch.setattr(os, "read", unexpected_read)
+        with pytest.raises(InspectionError) as error:
+            PathPolicy(StartupConfig()).open_text(str(source), inspection_context)
+        assert error.value.code == "UNSUPPORTED"
+    finally:
+        assert function(str(source), 0x80)
+
+
+def test_mapped_remote_drive_denied_before_open(tmp_path, inspection_context, monkeypatch):
+    from devtools_mcp_server.platforms import windows
+
+    source = tmp_path / "app.py"
+    source.write_text("safe")
+    kernel, _ = windows._file_api()
+    monkeypatch.setattr(kernel, "GetDriveTypeW", lambda path: 4)
+    with pytest.raises(InspectionError) as error:
+        PathPolicy(StartupConfig()).open_text(str(source), inspection_context)
+    assert error.value.code == "UNSUPPORTED"
