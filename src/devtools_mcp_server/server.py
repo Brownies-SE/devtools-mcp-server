@@ -1,29 +1,32 @@
 import logging
-import time
-from pathlib import Path
+from contextlib import asynccontextmanager
 
 import anyio
 from mcp import types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.shared.exceptions import MCPError
-from pydantic import ValidationError
 
 from .models import (
-    CaptureBudget,
-    InspectionContext,
-    InspectionError,
     Reply,
-    RuntimeState,
     StartupConfig,
-    ToolError,
 )
 from .results import SafeSendStream, to_mcp_result
+from .supervisor import Supervisor
 from .tools import definitions
 
 
 def create_server(config: StartupConfig) -> Server:
     registry = {tool.name: tool for tool in definitions()}
+    supervisor = Supervisor(config)
+
+    @asynccontextmanager
+    async def lifespan(server):
+        await supervisor.bootstrap()
+        try:
+            yield {}
+        finally:
+            await supervisor.aclose()
 
     async def list_tools(ctx, params):
         return types.ListToolsResult(
@@ -43,28 +46,13 @@ def create_server(config: StartupConfig) -> Server:
         tool = registry.get(params.name)
         if tool is None:
             raise MCPError(-32602, "Unknown tool")
-        try:
-            args = tool.input_model.model_validate(params.arguments or {})
-            context = InspectionContext(
-                config, time.monotonic() + 10, CaptureBudget(), RuntimeState(), Path.cwd()
-            )
-            reply = tool.handler(args, context)
-        except ValidationError:
-            reply = Reply[tool.data_model](
-                status="error",
-                error=ToolError(
-                    code="INVALID_ARGUMENT", message="Arguments do not match the tool schema."
-                ),
-            )
-        except InspectionError as error:
-            reply = Reply[tool.data_model](
-                status="error", error=ToolError(code=error.code, message=error.message)
-            )
+        reply = await supervisor.call(params.name, params.arguments or {})
         return to_mcp_result(reply)
 
     server = Server(
         "devtools-mcp-server",
         version="0.1.0",
+        lifespan=lifespan,
         on_list_tools=list_tools,
         on_call_tool=call_tool,
     )
