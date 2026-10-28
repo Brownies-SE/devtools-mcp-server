@@ -201,10 +201,18 @@ class PathPolicy:
         self.deny(path, metadata=metadata)
         self._mount_hint(path)
         if os.name == "nt":
-            resolved = path.resolve(strict=True)
-            self.deny(resolved, metadata=metadata)
-            self._mount_hint(resolved)
-            return resolved, []
+            from .platforms.windows import resolve_path
+
+            if any(":" in part or part.endswith((".", " ")) for part in path.parts[1:]):
+                raise InspectionError(
+                    "INVALID_ARGUMENT", "Alternate streams and ambiguous names are not supported."
+                )
+
+            def allow(candidate):
+                self.deny(candidate, metadata=metadata)
+                self._mount_hint(candidate)
+
+            return resolve_path(path, allow)
         aliases = []
         remaining = list(path.parts[1:])
         current = Path("/")
