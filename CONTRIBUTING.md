@@ -21,3 +21,5 @@ Use `fix/...` for fixes and `chore/...` for repository maintenance. Documentatio
 Pull requests to `main` must come from this repository's `dev` branch and represent a requested release. Do not push directly to either shared branch.
 
 Describe the problem, resulting behavior, checks performed, and any checks not run. Never include credentials or real secrets in code, examples, logs, or test fixtures.
+
+Protected branches require the branch-policy check and all three native Python checks. The Python test steps apply once the Python project is present on a PR branch; documentation-only scaffolding can pass without it. See [SECURITY.md](SECURITY.md) for repository controls and private vulnerability reporting.

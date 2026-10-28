@@ -1,0 +1,9 @@
+
+# Local secrets must never be published.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
