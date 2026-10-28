@@ -37,6 +37,7 @@ async def test_stdio_environment_tool():
                 "docker_containers",
                 "docker_inspect",
                 "docker_logs",
+                "http_check",
             }
             result = await session.call_tool("environment_info", {})
             assert not result.is_error

@@ -6,7 +6,7 @@ requires-python = ">=3.14,<3.15"
 dependencies = ["mcp>=2,<3", "psutil>=7,<8", "pydantic>=2.12,<3"]
 
 [dependency-groups]
-dev = ["pytest>=8,<10", "ruff>=0.9,<1", "anyio>=4.10,<5"]
+dev = ["pytest>=8,<10", "ruff>=0.9,<1", "anyio>=4.10,<5", "cryptography>=50,<51"]
 
 [build-system]
 requires = ["hatchling==1.29.0"]
