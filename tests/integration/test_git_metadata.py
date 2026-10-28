@@ -219,3 +219,14 @@ def test_unused_filter_and_eol_settings_do_not_hide_changes(unborn_repository, i
     reply = m.git_status(m.GitStatusArgs(repository=str(repo)), inspection_context)
     assert "app.py" in reply.data.unstaged
     assert "app.py" not in reply.data.unknown
+
+
+def test_private_object_store_can_resolve_commit(unborn_repository, inspection_context):
+    m = module()
+    repo = unborn_repository
+    commit(repo)
+    oid = git(repo, "rev-parse", "HEAD").decode().strip()
+    with m.open_git_view(str(repo), inspection_context) as view:
+        result = view.command("cat-file", "-t", oid)
+        assert result.returncode == 0, result.stderr.decode("utf-8", errors="replace")
+        assert result.stdout.strip() == b"commit"
