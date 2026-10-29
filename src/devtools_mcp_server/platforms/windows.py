@@ -2,10 +2,13 @@
 
 import ctypes
 import os
-from contextlib import ExitStack
+import stat
+import time
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from types import SimpleNamespace
 
 from ..models import InspectionError
 
@@ -200,7 +203,7 @@ def _root(path):
     drive = str(path.anchor)
     if len(drive) != 3 or drive[1:] != ":\\" or kernel.GetDriveTypeW(drive) not in {2, 3, 5, 6}:
         raise InspectionError("UNSUPPORTED", "Only verified local drives are supported.")
-    handle = kernel.CreateFileW(drive, 0x100080, 7, None, 3, 0x02300000, None)
+    handle = kernel.CreateFileW(drive, 0x100081, 7, None, 3, 0x02300000, None)
     if handle == ctypes.c_void_p(-1).value:
         raise ctypes.WinError(ctypes.get_last_error())
     return _fd(handle)
@@ -411,7 +414,11 @@ def open_verified(path, directory, allow, aliases, ctx):
                     "UNSUPPORTED", "Only ordinary files and directories are supported."
                 )
             allow(descriptor_path(metadata))
-            fd = metadata if is_directory else _relative(parent, name, data=True)
+            fd = (
+                metadata
+                if is_directory and index < len(path.parts) - 2
+                else _relative(parent, name, data=True)
+            )
             if fd != metadata:
                 stack.callback(os.close, fd)
                 if _identity(fd) != _identity(metadata):
@@ -425,3 +432,110 @@ def open_verified(path, directory, allow, aliases, ctx):
     except BaseException:
         stack.close()
         raise
+
+
+@dataclass(frozen=True)
+class NativeDirectoryEntry:
+    name: str
+    info: object
+
+    def stat(self, *, follow_symlinks=False):
+        if follow_symlinks:
+            raise InspectionError("UNSUPPORTED", "Directory metadata is no-follow only.")
+        return self.info
+
+
+@contextmanager
+def scandir_verified(proof, ctx):
+    """Enumerate the retained directory handle without reopening its path."""
+    from ctypes import wintypes
+
+    class DirectoryInfo(ctypes.Structure):
+        _fields_ = [
+            ("NextEntryOffset", wintypes.DWORD),
+            ("FileIndex", wintypes.DWORD),
+            ("CreationTime", ctypes.c_int64),
+            ("LastAccessTime", ctypes.c_int64),
+            ("LastWriteTime", ctypes.c_int64),
+            ("ChangeTime", ctypes.c_int64),
+            ("EndOfFile", ctypes.c_int64),
+            ("AllocationSize", ctypes.c_int64),
+            ("FileAttributes", wintypes.DWORD),
+            ("FileNameLength", wintypes.DWORD),
+            ("EaSize", wintypes.DWORD),
+            ("FileName", wintypes.WCHAR * 1),
+        ]
+
+    def entries():
+        kernel, _ = _file_api()
+        buffer = ctypes.create_string_buffer(65536)
+        first = True
+        while True:
+            if time.monotonic() >= ctx.deadline:
+                raise InspectionError("TIMEOUT", "Native directory enumeration timed out.")
+            proof.verify()
+            if not kernel.GetFileInformationByHandleEx(
+                _handle(proof.fd), 15 if first else 14, buffer, len(buffer)
+            ):
+                error = ctypes.get_last_error()
+                if error == 18:
+                    return
+                if error in {50, 87}:
+                    raise InspectionError(
+                        "UNSUPPORTED", "Native directory enumeration is unsupported on this volume."
+                    )
+                raise ctypes.WinError(error)
+            first = False
+            offset = 0
+            while True:
+                if offset + ctypes.sizeof(DirectoryInfo) > len(buffer):
+                    raise InspectionError("UNSUPPORTED", "Invalid native directory record.")
+                row = DirectoryInfo.from_buffer(buffer, offset)
+                start = offset + DirectoryInfo.FileName.offset
+                end = start + row.FileNameLength
+                if row.FileNameLength == 0 or row.FileNameLength % 2 or end > len(buffer):
+                    raise InspectionError("UNSUPPORTED", "Invalid native filename metadata.")
+                name = buffer.raw[start:end].decode("utf-16-le")
+                if name not in {".", ".."}:
+                    ctx.budget.visit_entry()
+                    if not row.FileAttributes & (0x1000 | 0x40000 | 0x400000):
+                        descriptor = _relative(proof.fd, name)
+                        try:
+                            attributes, tag = _attributes(descriptor)
+                            if not filesystem_is_local(descriptor):
+                                raise InspectionError(
+                                    "UNSUPPORTED", "Unverified directory entry volume."
+                                )
+                            info = os.fstat(descriptor)
+                            mode = (
+                                stat.S_IFLNK
+                                if tag in {0xA0000003, 0xA000000C}
+                                else (stat.S_IFDIR if attributes & 0x10 else stat.S_IFREG)
+                            )
+                            snapshot = SimpleNamespace(
+                                st_mode=mode,
+                                st_dev=info.st_dev,
+                                st_ino=info.st_ino,
+                                st_size=info.st_size,
+                                st_mtime=info.st_mtime,
+                                st_file_attributes=attributes,
+                                st_reparse_tag=tag,
+                            )
+                        finally:
+                            os.close(descriptor)
+                        proof.verify()
+                        yield NativeDirectoryEntry(name, snapshot)
+                if row.NextEntryOffset == 0:
+                    break
+                if (
+                    row.NextEntryOffset < DirectoryInfo.FileName.offset + row.FileNameLength
+                    or row.NextEntryOffset % 8
+                ):
+                    raise InspectionError("UNSUPPORTED", "Invalid native directory continuation.")
+                offset += row.NextEntryOffset
+
+    iterator = entries()
+    try:
+        yield iterator
+    finally:
+        iterator.close()

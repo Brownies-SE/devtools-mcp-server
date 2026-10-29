@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -49,6 +50,7 @@ async def _discard_errors(stream) -> None:
 class Supervisor:
     def __init__(self, config: StartupConfig):
         self.config = config
+        self._startup_directory = os.getcwd()
         self.runtime = RuntimeState()
         self._leases = set()
         self._calls = set()
@@ -174,7 +176,10 @@ class Supervisor:
         try:
             deadline = time.monotonic() + CALL_TIMEOUT
             async with asyncio.timeout_at(deadline - 0.1):
-                state = await self._run({"operation": "bootstrap"}, deadline)
+                state = await self._run(
+                    {"operation": "bootstrap", "startup_directory": self._startup_directory},
+                    deadline,
+                )
                 self.runtime = RuntimeState(**state)
         except OSError, ValueError, TimeoutError:
             self.runtime = RuntimeState()

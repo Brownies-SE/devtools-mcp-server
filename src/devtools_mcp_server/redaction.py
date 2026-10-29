@@ -9,8 +9,8 @@ KEY_NAME = re.compile(
     r"(?:api|access|refresh|auth|private|signing|client)[_-]?(?:key|token|secret))"
 )
 _PRIVATE = re.compile(
-    r"-----BEGIN (?:[A-Z0-9]+ )?PRIVATE KEY-----.*?"
-    r"(?:-----END (?:[A-Z0-9]+ )?PRIVATE KEY-----|\Z)",
+    r"-----BEGIN (?:[A-Z0-9]+ )?PRIVATE KEY(?: BLOCK)?-----.*?"
+    r"(?:-----END (?:[A-Z0-9]+ )?PRIVATE KEY(?: BLOCK)?-----|\Z)",
     re.DOTALL,
 )
 _HEADERS = re.compile(
@@ -27,7 +27,7 @@ _TOKENS = re.compile(
     r"sk-(?:proj-)?[A-Za-z0-9_-]{16,}|xox[baprs]-[A-Za-z0-9-]{10,}|"
     r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b"
 )
-_OPAQUE_LINE = re.compile(r"[A-Za-z0-9+/=]{16,}")
+_OPAQUE_LINE = re.compile(r"(?:[A-Za-z0-9+/=]{4})+|=[A-Za-z0-9+/]{4}")
 
 
 @dataclass(frozen=True)
@@ -70,16 +70,17 @@ class RecordSanitizer:
                 self.ambiguous = True
                 self.omitted_count += 1
                 continue
-            if "-----BEGIN " in text and "PRIVATE KEY-----" in text:
+            private_marker = "PRIVATE KEY-----" in text or "PRIVATE KEY BLOCK-----" in text
+            if "-----BEGIN " in text and private_marker:
                 self._private = True
             if self._private:
                 output.append((REDACTED + "\n").encode())
                 self.redacted = True
-                if "-----END " in text and "PRIVATE KEY-----" in text:
+                if "-----END " in text and private_marker:
                     self._private = False
                     self._leading = False
                 continue
-            if "-----END " in text and "PRIVATE KEY-----" in text:
+            if "-----END " in text and private_marker:
                 self.redacted = True
                 self._leading = False
                 self.omitted_count += 1

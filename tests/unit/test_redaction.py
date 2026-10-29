@@ -72,3 +72,20 @@ def test_incomplete_record_and_invalid_utf8_are_not_released():
     output = stream.feed(b"visible\npassword=fixture-secret-") + stream.finish()
     assert b"fixture-secret" not in output
     assert stream.ambiguous
+
+
+def test_pgp_private_key_armor_is_filtered_in_text_and_logs():
+    text = "-----BEGIN PGP PRIVATE KEY BLOCK-----\nfixture-private-pgp-body\n-----END PGP PRIVATE KEY BLOCK-----\nready\n"
+    clean = sanitize(text)
+    assert "fixture-private-pgp-body" not in clean.text
+    stream = redaction.RecordSanitizer(leading_fragment=False)
+    output = stream.feed(text.encode()) + stream.finish()
+    assert b"fixture-private-pgp-body" not in output
+    assert b"ready" in output
+
+
+def test_short_private_key_tail_is_not_treated_as_complete_record():
+    stream = redaction.RecordSanitizer()
+    output = stream.feed(b"YWJj\n-----END PRIVATE KEY-----\nready\n") + stream.finish()
+    assert b"YWJj" not in output
+    assert b"ready" in output

@@ -241,3 +241,16 @@ def test_untrusted_tls_certificate_is_rejected(tls_contexts, inspection_context)
     ):
         m.http_check(m.HttpCheckArgs(url=url), inspection_context)
     assert error.value.code == "UNAVAILABLE"
+
+
+def test_incomplete_body_is_not_returned_as_complete_evidence(inspection_context):
+    m = module()
+    raw = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 100\r\n\r\nshort"
+    with local_server(raw) as (url, _):
+        reply = m.http_check(
+            m.HttpCheckArgs(url=url, method="GET", include_body=True), inspection_context
+        )
+    assert reply.status == "partial"
+    assert reply.data.http_status == 200
+    assert reply.data.body is None
+    assert any(warning.code == "UNAVAILABLE" for warning in reply.warnings)

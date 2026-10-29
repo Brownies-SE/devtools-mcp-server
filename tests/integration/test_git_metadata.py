@@ -230,3 +230,27 @@ def test_private_object_store_can_resolve_commit(unborn_repository, inspection_c
         result = view.command("cat-file", "-t", oid)
         assert result.returncode == 0, result.stderr.decode("utf-8", errors="replace")
         assert result.stdout.strip() == b"commit"
+
+
+def test_raw_git_config_is_not_persisted_in_scratch(unborn_repository, inspection_context):
+    m = module()
+    repo = unborn_repository
+    commit(repo)
+    secret = b"fixture-sensitive-config-blob"
+    with (repo / ".git" / "config").open("a", encoding="utf-8") as stream:
+        stream.write("\n[example]\nvalue = " + secret.decode() + "\n")
+    m.git_log(m.GitLogArgs(repository=str(repo)), inspection_context)
+    for path in inspection_context.scratch_dir.rglob("*"):
+        if path.is_file() and not path.is_relative_to(repo):
+            assert secret not in path.read_bytes(), (
+                "Raw source configuration persisted in inspection scratch"
+            )
+
+
+def test_protected_head_ref_is_not_reported_as_unborn(unborn_repository, inspection_context):
+    m = module()
+    commit(unborn_repository)
+    git(unborn_repository, "branch", "-m", "credentials")
+    with pytest.raises(InspectionError) as error:
+        m.git_log(m.GitLogArgs(repository=str(unborn_repository)), inspection_context)
+    assert error.value.code == "SECRET_BLOCKED"

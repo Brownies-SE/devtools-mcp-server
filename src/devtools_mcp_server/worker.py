@@ -50,8 +50,12 @@ def main() -> None:
                 "message": "Local Docker endpoint cannot be verified.",
             }
         output = {
-            "git_executable": resolve_executable("git"),
-            "docker_executable": resolve_executable("docker"),
+            "git_executable": resolve_executable(
+                "git", excluded_directory=request.get("startup_directory")
+            ),
+            "docker_executable": resolve_executable(
+                "docker", excluded_directory=request.get("startup_directory")
+            ),
             "docker_endpoint": endpoint,
             "docker_error": docker_error,
         }

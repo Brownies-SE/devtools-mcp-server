@@ -161,6 +161,18 @@ class GitReadView:
             (self.metadata_dir / "objects" / "info").mkdir(parents=True)
             (self.metadata_dir / "refs").mkdir()
             self.copy(self.storage, "HEAD")
+            head = _text((self.metadata_dir / "HEAD").read_bytes()).strip()
+            if head.startswith("ref: "):
+                ref = head[5:]
+                try:
+                    _ref(ref)
+                except InspectionError:
+                    raise _error() from None
+                if not ref.startswith("refs/"):
+                    raise _error()
+                self.policy.deny(self.common / ref, metadata=True)
+            elif not re.fullmatch(r"[a-fA-F0-9]{40}|[a-fA-F0-9]{64}", head):
+                raise _error()
             self.copy(self.storage, "index", optional=True)
             for name in ["packed-refs", "shallow", "info/exclude"]:
                 self.copy(self.common, name, optional=True)
@@ -278,13 +290,13 @@ class GitReadView:
             output.write_bytes(raw)
 
     def parse_config(self, raw):
-        (self.ctx.scratch_dir / "raw-config").write_bytes(raw)
         capture = self.command(
             "config",
-            "--file=" + str(self.ctx.scratch_dir / "raw-config"),
+            "--file=-",
             "--no-includes",
             "--null",
             "--list",
+            input_data=raw,
         )
         if capture.returncode:
             raise _error(message="Git configuration syntax is unsupported.")
@@ -342,7 +354,7 @@ class GitReadView:
             if not unchanged:
                 raise _error("ACCESS_DENIED", "Git metadata changed during inspection.")
 
-    def command(self, *args, capture="ordinary", ignore_tree=False):
+    def command(self, *args, capture="ordinary", ignore_tree=False, input_data=None):
         if args[0] in {"--version", "version"}:
             return run_command("git", tuple(args), self.ctx)
         self.verify()
@@ -352,6 +364,7 @@ class GitReadView:
             ("--git-dir=" + str(self.metadata_dir), "--work-tree=" + str(worktree), *args),
             self.ctx,
             capture=capture,
+            input_data=input_data,
         )
         self.verify()
         return result

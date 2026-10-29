@@ -211,17 +211,21 @@ def docker_logs(args: DockerLogsArgs, ctx) -> Reply[DockerLogsData]:
     if args.since is not None:
         arguments += ("--since", args.since)
     capture = _command((*arguments, args.container_id), ctx)
-    sanitizer = RecordSanitizer(leading_fragment=True)
-    text = sanitizer.feed(capture.stdout + capture.stderr) + sanitizer.finish()
+    parts, sanitizers = [], []
+    for raw in (capture.stdout, capture.stderr):
+        sanitizer = RecordSanitizer(leading_fragment=True)
+        parts.append(sanitizer.feed(raw) + sanitizer.finish())
+        sanitizers.append(sanitizer)
+    ambiguous = any(item.ambiguous for item in sanitizers)
     warnings = (
         [Warning(code="UNSUPPORTED", message="Incomplete or ambiguous log records were omitted.")]
-        if sanitizer.ambiguous
+        if ambiguous
         else []
     )
     return Reply[DockerLogsData](
-        data=DockerLogsData(text=text.decode("utf-8")),
-        redacted=sanitizer.redacted,
+        data=DockerLogsData(text=b"".join(parts).decode("utf-8")),
+        redacted=any(item.redacted for item in sanitizers),
         status="partial" if warnings else "ok",
         warnings=warnings,
-        omitted_count=sanitizer.omitted_count,
+        omitted_count=sum(item.omitted_count for item in sanitizers),
     )

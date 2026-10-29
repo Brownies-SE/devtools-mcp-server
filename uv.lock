@@ -163,6 +163,7 @@ dependencies = [
 dev = [
     { name = "anyio" },
     { name = "cryptography" },
+    { name = "jsonschema" },
     { name = "pytest" },
     { name = "ruff" },
 ]
@@ -178,6 +179,7 @@ requires-dist = [
 dev = [
     { name = "anyio", specifier = ">=4.10,<5" },
     { name = "cryptography", specifier = ">=50,<51" },
+    { name = "jsonschema", specifier = ">=4,<5" },
     { name = "pytest", specifier = ">=8,<10" },
     { name = "ruff", specifier = ">=0.9,<1" },
 ]

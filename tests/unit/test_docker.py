@@ -148,3 +148,20 @@ def test_ambiguous_discovery_requires_explicit_endpoint(monkeypatch):
             with pytest.raises(InspectionError) as error:
                 m.select_local_endpoint(StartupConfig())
             assert error.value.code == "UNAVAILABLE"
+
+
+def test_stderr_key_tail_is_sanitized_independently(inspection_context, monkeypatch):
+    m = module()
+    inspection_context.runtime = replace(
+        inspection_context.runtime,
+        docker_executable="/fixture/docker",
+        docker_endpoint="unix:///fixture/docker.sock",
+    )
+    monkeypatch.setattr(
+        m,
+        "run_command",
+        lambda *args: CommandCapture(0, b"ready\n", b"YWJj\n-----END PRIVATE KEY-----\n"),
+    )
+    reply = m.docker_logs(m.DockerLogsArgs(container_id="a" * 12), inspection_context)
+    assert "YWJj" not in reply.data.text
+    assert "ready" in reply.data.text

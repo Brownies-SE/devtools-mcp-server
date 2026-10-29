@@ -31,10 +31,13 @@ def minimal_environment() -> dict[str, str]:
     return {key: value for key in _ENV_KEYS if (value := os.environ.get(key)) is not None}
 
 
-def resolve_executable(name: str) -> str | None:
+def resolve_executable(name: str, *, excluded_directory: str | None = None) -> str | None:
     suffixes = (".exe",) if os.name == "nt" else ("",)
+    excluded = os.path.normcase(os.path.realpath(excluded_directory or os.getcwd()))
     for directory in os.environ.get("PATH", os.defpath).split(os.pathsep):
         if not directory or not os.path.isabs(directory) or directory.startswith(("//", "\\\\")):
+            continue
+        if os.path.normcase(os.path.realpath(directory)) == excluded:
             continue
         for suffix in suffixes:
             candidate = Path(directory) / (name + suffix)
@@ -51,10 +54,19 @@ class CommandCapture:
 
 
 def run_command(
-    program, arguments: tuple[str, ...], ctx: InspectionContext, *, capture="ordinary"
+    program,
+    arguments: tuple[str, ...],
+    ctx: InspectionContext,
+    *,
+    capture="ordinary",
+    input_data: bytes | None = None,
 ) -> CommandCapture:
     if program not in {"git", "docker"} or not arguments or capture not in {"ordinary", "git_blob"}:
         raise InspectionError("INVALID_ARGUMENT", "Unsupported inspection command.")
+    if input_data is not None and (
+        not isinstance(input_data, bytes) or len(input_data) > 1048576 or program != "git"
+    ):
+        raise InspectionError("INVALID_ARGUMENT", "Unsupported bounded inspection input.")
     if program == "git":
         remaining = list(arguments)
         private_view = False
@@ -84,15 +96,17 @@ def run_command(
             raise InspectionError(
                 "INVALID_ARGUMENT", "Git write or conversion options are forbidden."
             )
-        if remaining[0] == "config" and remaining != [
-            "config",
-            "--file=" + str(ctx.scratch_dir / "raw-config"),
-            "--no-includes",
-            "--null",
-            "--list",
-        ]:
+        if remaining[0] == "config":
+            if (
+                remaining != ["config", "--file=-", "--no-includes", "--null", "--list"]
+                or input_data is None
+            ):
+                raise InspectionError(
+                    "INVALID_ARGUMENT", "Only bounded no-include config parsing is allowed."
+                )
+        elif input_data is not None:
             raise InspectionError(
-                "INVALID_ARGUMENT", "Only private no-include config parsing is allowed."
+                "INVALID_ARGUMENT", "Input is only permitted for private configuration parsing."
             )
         if remaining[0] == "symbolic-ref" and [
             arg for arg in remaining[1:] if not arg.startswith("-")
@@ -151,7 +165,7 @@ def run_command(
         prefix = ["--config", str(config), "--host", ctx.runtime.docker_endpoint]
     process = subprocess.Popen(
         [executable, *prefix, *arguments],
-        stdin=subprocess.DEVNULL,
+        stdin=subprocess.PIPE if input_data is not None else subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=env,
@@ -160,30 +174,67 @@ def run_command(
     records = queue.Queue(maxsize=8)
     stop = threading.Event()
 
+    accounting_lock = threading.Lock()
+    source = f"command-{time.monotonic_ns()}"
+
+    def publish(label, value):
+        while not stop.is_set():
+            try:
+                records.put((label, value), timeout=0.05)
+                return
+            except queue.Full:
+                continue
+
     def drain(pipe, label):
         try:
             while not stop.is_set():
                 chunk = pipe.read(16384)
-                while not stop.is_set():
-                    try:
-                        records.put((label, chunk), timeout=0.05)
-                        break
-                    except queue.Full:
-                        continue
+                if chunk:
+                    channel = (
+                        "git_blob" if capture == "git_blob" and label == "stdout" else "ordinary"
+                    )
+                    with accounting_lock:
+                        ctx.budget.consume(
+                            channel, len(chunk), source=source if channel == "git_blob" else None
+                        )
+                publish(label, chunk)
                 if not chunk:
                     break
-        except OSError:
-            pass
+        except InspectionError as error:
+            publish("failure", error)
+        except OSError, ValueError:
+            if not stop.is_set():
+                publish(
+                    "failure",
+                    InspectionError(
+                        "UNAVAILABLE", "An inspection output stream could not be read."
+                    ),
+                )
 
     threads = [
         threading.Thread(target=drain, args=(pipe, label), daemon=True)
         for pipe, label in ((process.stdout, "stdout"), (process.stderr, "stderr"))
     ]
+    if input_data is not None:
+
+        def send_input():
+            try:
+                process.stdin.write(input_data)
+                process.stdin.close()
+            except OSError, ValueError:
+                if not stop.is_set():
+                    publish(
+                        "failure",
+                        InspectionError(
+                            "UNAVAILABLE", "Private configuration input could not be sent."
+                        ),
+                    )
+
+        threads.append(threading.Thread(target=send_input, daemon=True))
     for thread in threads:
         thread.start()
     outputs = {"stdout": bytearray(), "stderr": bytearray()}
     complete = set()
-    source = f"command-{time.monotonic_ns()}"
     try:
         while len(complete) != 2:
             remaining = ctx.deadline - time.monotonic()
@@ -193,13 +244,11 @@ def run_command(
                 label, chunk = records.get(timeout=min(remaining, 0.05))
             except queue.Empty:
                 continue
+            if label == "failure":
+                raise chunk
             if not chunk:
                 complete.add(label)
                 continue
-            channel = "git_blob" if capture == "git_blob" and label == "stdout" else "ordinary"
-            ctx.budget.consume(
-                channel, len(chunk), source=source if channel == "git_blob" else None
-            )
             outputs[label].extend(chunk)
         remaining = max(0.01, ctx.deadline - time.monotonic())
         returncode = process.wait(timeout=remaining)
@@ -214,7 +263,8 @@ def run_command(
             process.wait(timeout=0.2)
         except subprocess.TimeoutExpired:
             pass
-        for pipe in (process.stdout, process.stderr):
-            pipe.close()
+        for pipe in (process.stdout, process.stderr, process.stdin):
+            if pipe is not None:
+                pipe.close()
         for thread in threads:
             thread.join(timeout=0.1)

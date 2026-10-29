@@ -1,4 +1,7 @@
+import asyncio
 import logging
+import os
+import signal
 from contextlib import asynccontextmanager
 
 import anyio
@@ -16,9 +19,9 @@ from .supervisor import Supervisor
 from .tools import definitions
 
 
-def create_server(config: StartupConfig) -> Server:
+def create_server(config: StartupConfig, *, _supervisor: Supervisor | None = None) -> Server:
     registry = {tool.name: tool for tool in definitions()}
-    supervisor = Supervisor(config)
+    supervisor = _supervisor or Supervisor(config)
 
     @asynccontextmanager
     async def lifespan(server):
@@ -26,7 +29,8 @@ def create_server(config: StartupConfig) -> Server:
         try:
             yield {}
         finally:
-            await supervisor.aclose()
+            with anyio.CancelScope(shield=True):
+                await supervisor.aclose()
 
     async def list_tools(ctx, params):
         return types.ListToolsResult(
@@ -63,9 +67,38 @@ def create_server(config: StartupConfig) -> Server:
 async def run_stdio(config: StartupConfig) -> None:
     logging.getLogger().handlers.clear()
     logging.getLogger().addHandler(logging.NullHandler())
-    server = create_server(config)
-    async with stdio_server() as (read, write):
-        await server.run(read, SafeSendStream(write), server.create_initialization_options())
+    supervisor = Supervisor(config)
+    server = create_server(config, _supervisor=supervisor)
+    previous = {}
+    shutdown_task = None
+    loop = asyncio.get_running_loop()
+
+    async def shutdown(number):
+        try:
+            async with asyncio.timeout(0.8):
+                await supervisor.aclose()
+        finally:
+            # The SDK's stdin reader may be blocked in a daemon thread while
+            # its client still holds the pipe. Owned inspections are stopped
+            # first; process exit must not wait for that unrelated input.
+            os._exit(128 + number)
+
+    def schedule_shutdown(number):
+        nonlocal shutdown_task
+        if shutdown_task is None:
+            shutdown_task = asyncio.create_task(shutdown(number))
+
+    if os.name == "posix":
+        for number in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+            previous[number] = signal.getsignal(number)
+            loop.add_signal_handler(number, schedule_shutdown, number)
+    try:
+        async with stdio_server() as (read, write):
+            await server.run(read, SafeSendStream(write), server.create_initialization_options())
+    finally:
+        for number, handler in previous.items():
+            loop.remove_signal_handler(number)
+            signal.signal(number, handler)
 
 
 def main() -> None:

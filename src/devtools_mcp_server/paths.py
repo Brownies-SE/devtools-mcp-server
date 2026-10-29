@@ -1,4 +1,5 @@
 import os
+import re
 import stat
 import sys
 import time
@@ -18,6 +19,7 @@ _SECRET_PARTS = {
     ".kube",
     "gcloud",
     "keychains",
+    "keyrings",
     "credentials",
     ".git-credentials",
     ".npmrc",
@@ -32,7 +34,21 @@ _SECRET_PARTS = {
     "secrets.yml",
     "application_default_credentials.json",
 }
-_SECRET_SUFFIXES = {".key", ".pem", ".p12", ".pfx", ".jks", ".keystore", ".kdbx"}
+_SECRET_SUFFIXES = {
+    ".key",
+    ".pem",
+    ".p12",
+    ".pfx",
+    ".jks",
+    ".keystore",
+    ".kdbx",
+    ".keyring",
+    ".keychain",
+    ".keychain-db",
+    ".ppk",
+    ".pvk",
+    ".p8",
+}
 _SKIP = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", "target"}
 _LOCAL_TYPES = {
     "apfs",
@@ -99,9 +115,17 @@ class VerifiedTextFile:
             raise InspectionError("OUTPUT_LIMIT", "File exceeds the 1 MiB source limit.")
         buffer = bytearray()
         source = f"{self.proof.initial.st_dev}:{self.proof.initial.st_ino}:{self.proof.initial.st_mtime_ns}"
-        while chunk := os.read(self.proof.fd, 16384):
-            self.ctx.budget.consume("file_scan", len(chunk), source=source)
+        remaining = self.proof.initial.st_size
+        while remaining:
+            if time.monotonic() >= self.ctx.deadline:
+                raise InspectionError("TIMEOUT", "File read timed out.")
+            amount = min(remaining, 16384)
+            self.ctx.budget.consume("file_scan", amount, source=source)
+            chunk = os.read(self.proof.fd, amount)
+            if not chunk:
+                raise InspectionError("ACCESS_DENIED", "Source changed during inspection.")
             buffer.extend(chunk)
+            remaining -= len(chunk)
         self.proof.verify()
         return bytes(buffer)
 
@@ -165,6 +189,7 @@ class PathPolicy:
         names = [part.casefold() for part in path.parts]
         if any(
             part in _SECRET_PARTS
+            or re.fullmatch(r"devtools-inspect-[a-z0-9_]{8}", part)
             or part == ".env"
             or part.startswith(".env.")
             or Path(part).suffix in _SECRET_SUFFIXES
@@ -175,7 +200,7 @@ class PathPolicy:
             raise InspectionError("SECRET_BLOCKED", "Direct Git storage access is not exposed.")
         if any(
             names[index : index + 2]
-            in [[".docker", "config.json"], [".config", "gh"], [".local", "keyrings"]]
+            in [[".docker", "config.json"], [".config", "gh"], ["microsoft", "protect"]]
             for index in range(len(names) - 1)
         ):
             raise InspectionError("SECRET_BLOCKED", "Credential configuration is off limits.")
@@ -316,9 +341,16 @@ class PathPolicy:
         skip_generated=True,
     ):
         proof.verify()
-        with os.scandir(str(proof.path) if os.name == "nt" else proof.fd) as entries:
+        if os.name == "nt":
+            from .platforms.windows import scandir_verified
+
+            directory = scandir_verified(proof, ctx)
+        else:
+            directory = os.scandir(proof.fd)
+        with directory as entries:
             for entry in entries:
-                ctx.budget.visit_entry()
+                if os.name != "nt":
+                    ctx.budget.visit_entry()
                 if time.monotonic() >= ctx.deadline:
                     raise InspectionError("TIMEOUT", "File traversal timed out.")
                 child = proof.path / entry.name
@@ -373,8 +405,6 @@ class PathPolicy:
 
 
 def read_git_metadata(repository: str, relative_key: str, ctx: InspectionContext) -> bytes:
-    import re
-
     from .platforms.posix import map_os_error
 
     permitted = {

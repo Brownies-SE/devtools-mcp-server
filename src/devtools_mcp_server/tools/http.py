@@ -232,6 +232,10 @@ def http_check(args: HttpCheckArgs, ctx) -> Reply[HttpCheckData]:
                             message="Response body exceeded the wire limit and was omitted.",
                         )
                     )
+                if response.length not in (None, 0):
+                    warnings.append(
+                        Warning(code="UNAVAILABLE", message="Incomplete response body was omitted.")
+                    )
                 if not warnings:
                     try:
                         if b"\0" in content:
