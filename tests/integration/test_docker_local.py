@@ -9,8 +9,10 @@ import pytest
 
 from devtools_mcp_server.execution import minimal_environment, resolve_executable
 from devtools_mcp_server.models import InspectionError, StartupConfig
+from devtools_mcp_server.redaction import sanitize_text
 from devtools_mcp_server.supervisor import Supervisor
 from devtools_mcp_server.tools.docker import (
+    _INSPECT_FORMAT,
     DockerContainersArgs,
     DockerInspectArgs,
     DockerLogsArgs,
@@ -95,6 +97,10 @@ def test_owned_container_state_and_logs(tmp_path, inspection_context, request):
         inspection_context.runtime, docker_executable=executable, docker_endpoint=endpoint
     )
     try:
+        selected = command("container", "inspect", "--format", _INSPECT_FORMAT, container_id)
+        assert selected.returncode == 0, sanitize_text(
+            selected.stderr.decode(errors="replace")
+        ).text
         reply = docker_inspect(DockerInspectArgs(container_id=container_id), inspection_context)
         assert reply.data.id == container_id
         rows = docker_containers(DockerContainersArgs(include_stopped=True), inspection_context)
