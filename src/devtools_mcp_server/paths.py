@@ -1,0 +1,433 @@
+import os
+import re
+import stat
+import sys
+import time
+import unicodedata
+from dataclasses import dataclass
+from pathlib import Path
+
+import psutil
+
+from .models import InspectionContext, InspectionError, StartupConfig
+
+_SECRET_PARTS = {
+    ".ssh",
+    ".aws",
+    ".azure",
+    ".gnupg",
+    ".kube",
+    "gcloud",
+    "keychains",
+    "keyrings",
+    "credentials",
+    ".git-credentials",
+    ".npmrc",
+    ".pypirc",
+    ".netrc",
+    "id_rsa",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+    "secrets.json",
+    "secrets.yaml",
+    "secrets.yml",
+    "application_default_credentials.json",
+}
+_SECRET_SUFFIXES = {
+    ".key",
+    ".pem",
+    ".p12",
+    ".pfx",
+    ".jks",
+    ".keystore",
+    ".kdbx",
+    ".keyring",
+    ".keychain",
+    ".keychain-db",
+    ".ppk",
+    ".pvk",
+    ".p8",
+}
+_LOCAL_TYPES = {
+    "apfs",
+    "hfs",
+    "ufs",
+    "exfat",
+    "msdos",
+    "vfat",
+    "ext2",
+    "ext3",
+    "ext4",
+    "xfs",
+    "btrfs",
+    "f2fs",
+    "tmpfs",
+    "ramfs",
+    "overlay",
+    "zfs",
+    "ntfs",
+    "ntfs3",
+    "refs",
+    "fat",
+    "fat32",
+    "iso9660",
+    "cd9660",
+    "udf",
+}
+
+
+def _normalized(path) -> str:
+    value = str(path).replace("\\", "/").rstrip("/")
+    if sys.platform == "darwin":
+        value = unicodedata.normalize("NFC", value)
+    return value.casefold() if os.name == "nt" or sys.platform == "darwin" else value
+
+
+def _within(path: str, parent: str) -> bool:
+    return path == parent or path.startswith(parent.rstrip("/") + "/")
+
+
+@dataclass(frozen=True)
+class VerifiedEntry:
+    path: Path
+    relative_path: str
+    type: str
+    size: int
+    modified_at: float
+
+
+class VerifiedTextFile:
+    def __init__(self, proof, ctx: InspectionContext):
+        self.proof = proof
+        self.ctx = ctx
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.proof.close()
+
+    def read_bytes(self) -> bytes:
+        self.proof.verify()
+        if self.proof.initial.st_size > 1048576:
+            raise InspectionError("OUTPUT_LIMIT", "File exceeds the 1 MiB source limit.")
+        buffer = bytearray()
+        source = f"{self.proof.initial.st_dev}:{self.proof.initial.st_ino}:{self.proof.initial.st_mtime_ns}"
+        remaining = self.proof.initial.st_size
+        while remaining:
+            if time.monotonic() >= self.ctx.deadline:
+                raise InspectionError("TIMEOUT", "File read timed out.")
+            amount = min(remaining, 16384)
+            self.ctx.budget.consume("file_scan", amount, source=source)
+            chunk = os.read(self.proof.fd, amount)
+            if not chunk:
+                raise InspectionError("ACCESS_DENIED", "Source changed during inspection.")
+            buffer.extend(chunk)
+            remaining -= len(chunk)
+        self.proof.verify()
+        return bytes(buffer)
+
+    def read_utf8(self) -> str:
+        buffer = self.read_bytes()
+        if b"\0" in buffer:
+            raise InspectionError("UNSUPPORTED", "Binary source files are not returned.")
+        try:
+            return bytes(buffer).decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raise InspectionError("UNSUPPORTED", "Only valid UTF-8 text is supported.") from None
+
+
+@dataclass
+class VerifiedLocation:
+    proof: object
+
+    @property
+    def path(self):
+        return self.proof.path
+
+    @property
+    def fd(self):
+        return self.proof.fd
+
+    @property
+    def device(self):
+        return self.proof.initial.st_dev
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.proof.close()
+
+
+class PathPolicy:
+    def __init__(self, config: StartupConfig):
+        self.config = config
+        self.exclusions = {_normalized(value) for value in config.extra_secret_paths}
+        for value in config.extra_secret_paths:
+            try:
+                self.exclusions.add(_normalized(Path(value).resolve(strict=False)))
+            except OSError, RuntimeError, ValueError:
+                pass
+        try:
+            self.mounts = sorted(
+                (
+                    (_normalized(item.mountpoint), item.fstype.casefold())
+                    for item in psutil.disk_partitions(all=True)
+                ),
+                key=lambda item: len(item[0]),
+                reverse=True,
+            )
+        except OSError, psutil.Error:
+            raise InspectionError(
+                "UNSUPPORTED", "Local filesystem mounts cannot be verified."
+            ) from None
+
+    def deny(self, path: Path, *, metadata=False) -> None:
+        names = [part.casefold() for part in path.parts]
+        if any(
+            part in _SECRET_PARTS
+            or re.fullmatch(r"devtools-inspect-[a-z0-9_]{8}", part)
+            or part == ".env"
+            or part.startswith(".env.")
+            or Path(part).suffix in _SECRET_SUFFIXES
+            for part in names
+        ):
+            raise InspectionError("SECRET_BLOCKED", "Known secret sources are off limits.")
+        if not metadata and ".git" in names:
+            raise InspectionError("SECRET_BLOCKED", "Direct Git storage access is not exposed.")
+        if any(
+            names[index : index + 2]
+            in [[".docker", "config.json"], [".config", "gh"], ["microsoft", "protect"]]
+            for index in range(len(names) - 1)
+        ):
+            raise InspectionError("SECRET_BLOCKED", "Credential configuration is off limits.")
+        if os.name != "nt" and path.parts[:2] in {("/", "proc"), ("/", "sys"), ("/", "dev")}:
+            raise InspectionError("UNSUPPORTED", "Pseudo-filesystem sources are not exposed.")
+        normalized = _normalized(path)
+        if any(_within(normalized, _normalized(item)) for item in self.exclusions):
+            raise InspectionError("SECRET_BLOCKED", "Source is excluded by the operator.")
+
+    def _mount_hint(self, path: Path) -> None:
+        normalized = _normalized(path)
+        for mount, kind in self.mounts:
+            if _within(normalized, mount):
+                if kind not in _LOCAL_TYPES:
+                    raise InspectionError(
+                        "UNSUPPORTED", "Remote, virtual or unverified filesystem."
+                    )
+                return
+        raise InspectionError("UNSUPPORTED", "Filesystem locality cannot be established.")
+
+    def _canonical(self, value: str, *, metadata=False):
+        if not isinstance(value, str) or not value or len(value) > 4096 or "\0" in value:
+            raise InspectionError("INVALID_ARGUMENT", "An absolute local path is required.")
+        path = Path(value)
+        if not path.is_absolute() or value.startswith(("//", "\\\\")):
+            raise InspectionError("INVALID_ARGUMENT", "An absolute non-network path is required.")
+        self.deny(path, metadata=metadata)
+        self._mount_hint(path)
+        if os.name == "nt":
+            from .platforms.windows import resolve_path
+
+            if any(":" in part or part.endswith((".", " ")) for part in path.parts[1:]):
+                raise InspectionError(
+                    "INVALID_ARGUMENT", "Alternate streams and ambiguous names are not supported."
+                )
+
+            def allow(candidate):
+                self.deny(candidate, metadata=metadata)
+                self._mount_hint(candidate)
+
+            return resolve_path(path, allow)
+        aliases = []
+        remaining = list(path.parts[1:])
+        current = Path("/")
+        links = 0
+        while remaining:
+            component = remaining.pop(0)
+            if component == "..":
+                current = current.parent
+                continue
+            candidate = current / component
+            self.deny(candidate, metadata=metadata)
+            self._mount_hint(candidate)
+            info = os.lstat(candidate)
+            if stat.S_ISLNK(info.st_mode):
+                links += 1
+                if links > 40:
+                    raise InspectionError("ACCESS_DENIED", "Alias resolution is ambiguous.")
+                target = os.readlink(candidate)
+                aliases.append((candidate, info, target))
+                full = Path(target) if os.path.isabs(target) else current / target
+                self.deny(full, metadata=metadata)
+                full = Path(os.path.normpath(str(full / Path(*remaining))))
+                self.deny(full, metadata=metadata)
+                self._mount_hint(full)
+                remaining = list(full.parts[1:])
+                current = Path("/")
+            else:
+                current = candidate
+        return current, aliases
+
+    def _open(self, path: Path, aliases, ctx, *, directory=False, metadata=False):
+        def allow(actual):
+            self.deny(actual, metadata=metadata)
+
+        if os.name == "nt":
+            from .platforms import windows
+
+            opener = getattr(windows, "open_verified", None)
+            if opener is None:
+                raise InspectionError(
+                    "UNSUPPORTED", "Native Windows path verification is unavailable."
+                )
+        else:
+            from .platforms.posix import open_verified
+
+            opener = open_verified
+        return opener(path, directory, allow, aliases, ctx)
+
+    def open_text(self, path: str, ctx: InspectionContext) -> VerifiedTextFile:
+        try:
+            resolved, aliases = self._canonical(path)
+            proof = self._open(resolved, aliases, ctx)
+            return VerifiedTextFile(proof, ctx)
+        except OSError as error:
+            from .platforms.posix import map_os_error
+
+            raise map_os_error(error) from None
+
+    def check_storage(self, path: str, purpose: str, ctx: InspectionContext) -> VerifiedLocation:
+        try:
+            resolved, aliases = self._canonical(path, metadata=purpose == "git")
+            directory = stat.S_ISDIR(os.lstat(resolved).st_mode)
+            return VerifiedLocation(
+                self._open(resolved, aliases, ctx, directory=directory, metadata=purpose == "git")
+            )
+        except OSError as error:
+            from .platforms.posix import map_os_error
+
+            raise map_os_error(error) from None
+
+    def iter_entries(
+        self,
+        directory: str,
+        recursive: bool,
+        ctx: InspectionContext,
+        *,
+        metadata=False,
+    ):
+        resolved, aliases = self._canonical(directory, metadata=metadata)
+        root = self._open(resolved, aliases, ctx, directory=True, metadata=metadata)
+        try:
+            yield from self._walk(root, resolved, root.initial.st_dev, recursive, ctx, metadata)
+        finally:
+            root.close()
+
+    def _walk(
+        self,
+        proof,
+        root: Path,
+        device: int,
+        recursive: bool,
+        ctx,
+        metadata=False,
+    ):
+        proof.verify()
+        if os.name == "nt":
+            from .platforms.windows import scandir_verified
+
+            directory = scandir_verified(proof, ctx)
+        else:
+            directory = os.scandir(proof.fd)
+        with directory as entries:
+            for entry in entries:
+                if os.name != "nt":
+                    ctx.budget.visit_entry()
+                if time.monotonic() >= ctx.deadline:
+                    raise InspectionError("TIMEOUT", "File traversal timed out.")
+                child = proof.path / entry.name
+                try:
+                    self.deny(child, metadata=metadata)
+                    self._mount_hint(child)
+                except InspectionError:
+                    continue
+                info = entry.stat(follow_symlinks=False)
+                if getattr(info, "st_flags", 0) & 0x40000000:
+                    continue
+                attributes = getattr(info, "st_file_attributes", 0)
+                tag = getattr(info, "st_reparse_tag", 0)
+                if attributes & (0x1000 | 0x40000 | 0x400000):
+                    continue
+                if (
+                    attributes & 0x400
+                    and tag not in {0xA0000003, 0xA000000C}
+                    and tag & ~0xF000 != 0x9000001A
+                ):
+                    continue
+                alias = stat.S_ISLNK(info.st_mode) or tag in {0xA0000003, 0xA000000C}
+                is_dir = stat.S_ISDIR(info.st_mode) and not alias
+                if alias:
+                    try:
+                        self._canonical(str(child), metadata=metadata)
+                    except InspectionError, OSError:
+                        continue
+                if not (stat.S_ISREG(info.st_mode) or is_dir or alias):
+                    continue
+                if entry.name == ".git":
+                    continue
+                proof.verify()
+                yield VerifiedEntry(
+                    child,
+                    child.relative_to(root).as_posix(),
+                    "symlink" if alias else ("directory" if is_dir else "file"),
+                    info.st_size,
+                    info.st_mtime,
+                )
+                if recursive and is_dir:
+                    opened = self._open(child, [], ctx, directory=True, metadata=metadata)
+                    try:
+                        if opened.initial.st_dev != device:
+                            continue
+                        yield from self._walk(opened, root, device, recursive, ctx, metadata)
+                    finally:
+                        opened.close()
+        proof.verify()
+
+
+def read_git_metadata(repository: str, relative_key: str, ctx: InspectionContext) -> bytes:
+    from .platforms.posix import map_os_error
+
+    permitted = {
+        ".git",
+        ".gitconfig",
+        "config",
+        "config.worktree",
+        "index",
+        "HEAD",
+        "commondir",
+        "packed-refs",
+        "shallow",
+        "info/exclude",
+        "info/attributes",
+        "objects/info/alternates",
+        "info/alternates",
+        "info/http-alternates",
+        "objects/info/http-alternates",
+    }
+    if relative_key not in permitted and not re.fullmatch(
+        r"refs/(?:heads|tags|remotes)/[^\x00-\x20~^:?*\\]+", relative_key
+    ):
+        raise InspectionError("INVALID_ARGUMENT", "Git metadata key is not permitted.")
+    if ".." in Path(relative_key).parts or Path(relative_key).is_absolute():
+        raise InspectionError("INVALID_ARGUMENT", "Git metadata key is not permitted.")
+    policy = PathPolicy(ctx.config)
+    try:
+        resolved, aliases = policy._canonical(str(Path(repository) / relative_key), metadata=True)
+        proof = policy._open(resolved, aliases, ctx, metadata=True)
+        with VerifiedTextFile(proof, ctx) as source:
+            return source.read_bytes()
+    except OSError as error:
+        raise map_os_error(error) from None
