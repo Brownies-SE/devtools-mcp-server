@@ -27,8 +27,8 @@ async def connected_client(*, command=None, cwd=None, env=None):
 
 @pytest.fixture
 async def unhealthy_api_client(anyio_backend):
-    with local_server(response(status=503)) as (url, _):
-        async with connected_client() as client:
+    async with connected_client() as client:
+        with local_server(response(status=503)) as (url, _):
             yield client, url
 
 
