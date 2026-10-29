@@ -1,0 +1,3741 @@
+{
+  "http_check": {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "method": {
+          "default": "HEAD",
+          "enum": [
+            "HEAD",
+            "GET"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "include_body": {
+          "default": false,
+          "title": "Include Body",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "HttpCheckArgs",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "HttpCheckData": {
+          "additionalProperties": false,
+          "properties": {
+            "http_status": {
+              "title": "Http Status",
+              "type": "integer"
+            },
+            "duration_seconds": {
+              "title": "Duration Seconds",
+              "type": "number"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Headers",
+              "type": "object"
+            },
+            "body": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Body"
+            }
+          },
+          "required": [
+            "http_status",
+            "duration_seconds",
+            "headers"
+          ],
+          "title": "HttpCheckData",
+          "type": "object"
+        },
+        "ToolError": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ToolError",
+          "type": "object"
+        },
+        "Warning": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "Warning",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "partial",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HttpCheckData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "omitted_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Count"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Reply[HttpCheckData]",
+      "type": "object"
+    }
+  },
+  "docker_containers": {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 100,
+          "maximum": 200,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        },
+        "include_stopped": {
+          "default": false,
+          "title": "Include Stopped",
+          "type": "boolean"
+        }
+      },
+      "title": "DockerContainersArgs",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "DockerContainer": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "image": {
+              "title": "Image",
+              "type": "string"
+            },
+            "state": {
+              "title": "State",
+              "type": "string"
+            },
+            "ports": {
+              "title": "Ports",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "image",
+            "state",
+            "ports"
+          ],
+          "title": "DockerContainer",
+          "type": "object"
+        },
+        "DockerContainersData": {
+          "additionalProperties": false,
+          "properties": {
+            "containers": {
+              "items": {
+                "$ref": "#/$defs/DockerContainer"
+              },
+              "title": "Containers",
+              "type": "array"
+            }
+          },
+          "required": [
+            "containers"
+          ],
+          "title": "DockerContainersData",
+          "type": "object"
+        },
+        "ToolError": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ToolError",
+          "type": "object"
+        },
+        "Warning": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "Warning",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "partial",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DockerContainersData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "omitted_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Count"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Reply[DockerContainersData]",
+      "type": "object"
+    }
+  },
+  "docker_inspect": {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "container_id": {
+          "pattern": "^[a-fA-F0-9]{1,64}$",
+          "title": "Container Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "container_id"
+      ],
+      "title": "DockerInspectArgs",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "DockerInspectData": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "status": {
+              "title": "Status",
+              "type": "string"
+            },
+            "running": {
+              "title": "Running",
+              "type": "boolean"
+            },
+            "health": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Health"
+            },
+            "restart_count": {
+              "title": "Restart Count",
+              "type": "integer"
+            },
+            "ports": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "items": {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ports"
+            },
+            "mount_destinations": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Mount Destinations",
+              "type": "array"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "status",
+            "running",
+            "health",
+            "restart_count",
+            "ports",
+            "mount_destinations"
+          ],
+          "title": "DockerInspectData",
+          "type": "object"
+        },
+        "ToolError": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ToolError",
+          "type": "object"
+        },
+        "Warning": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "Warning",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "partial",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DockerInspectData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "omitted_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Count"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Reply[DockerInspectData]",
+      "type": "object"
+    }
+  },
+  "docker_logs": {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "container_id": {
+          "pattern": "^[a-fA-F0-9]{1,64}$",
+          "title": "Container Id",
+          "type": "string"
+        },
+        "since": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Since"
+        },
+        "tail": {
+          "default": 200,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Tail",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "container_id"
+      ],
+      "title": "DockerLogsArgs",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "DockerLogsData": {
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "title": "DockerLogsData",
+          "type": "object"
+        },
+        "ToolError": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ToolError",
+          "type": "object"
+        },
+        "Warning": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "Warning",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "partial",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DockerLogsData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "omitted_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Count"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Reply[DockerLogsData]",
+      "type": "object"
+    }
+  },
+  "git_diff": {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Repository",
+          "type": "string"
+        },
+        "mode": {
+          "default": "working",
+          "enum": [
+            "working",
+            "staged",
+            "commit"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        },
+        "paths": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 4096,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 100,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Paths"
+        }
+      },
+      "required": [
+        "repository"
+      ],
+      "title": "GitDiffArgs",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "GitDiffData": {
+          "additionalProperties": false,
+          "properties": {
+            "files": {
+              "items": {
+                "$ref": "#/$defs/GitFileDiff"
+              },
+              "title": "Files",
+              "type": "array"
+            }
+          },
+          "required": [
+            "files"
+          ],
+          "title": "GitDiffData",
+          "type": "object"
+        },
+        "GitFileDiff": {
+          "additionalProperties": false,
+          "properties": {
+            "old_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Old Path"
+            },
+            "new_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "New Path"
+            },
+            "patch": {
+              "title": "Patch",
+              "type": "string"
+            }
+          },
+          "required": [
+            "old_path",
+            "new_path",
+            "patch"
+          ],
+          "title": "GitFileDiff",
+          "type": "object"
+        },
+        "ToolError": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ToolError",
+          "type": "object"
+        },
+        "Warning": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "Warning",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "partial",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitDiffData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "omitted_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Count"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Reply[GitDiffData]",
+      "type": "object"
+    }
+  },
+  "git_status": {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Repository",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository"
+      ],
+      "title": "GitStatusArgs",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "GitStatusData": {
+          "additionalProperties": false,
+          "properties": {
+            "branch": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Branch"
+            },
+            "staged": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Staged",
+              "type": "array"
+            },
+            "unstaged": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Unstaged",
+              "type": "array"
+            },
+            "untracked": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Untracked",
+              "type": "array"
+            },
+            "unknown": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Unknown",
+              "type": "array"
+            }
+          },
+          "required": [
+            "branch",
+            "staged",
+            "unstaged",
+            "untracked",
+            "unknown"
+          ],
+          "title": "GitStatusData",
+          "type": "object"
+        },
+        "ToolError": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ToolError",
+          "type": "object"
+        },
+        "Warning": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "Warning",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "partial",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitStatusData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "omitted_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Count"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Reply[GitStatusData]",
+      "type": "object"
+    }
+  },
+  "git_branches": {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 100,
+          "maximum": 200,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        },
+        "repository": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Repository",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository"
+      ],
+      "title": "GitBranchesArgs",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "GitBranch": {
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "commit": {
+              "title": "Commit",
+              "type": "string"
+            },
+            "current": {
+              "title": "Current",
+              "type": "boolean"
+            },
+            "tracking_remote": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Tracking Remote"
+            },
+            "tracking_ref": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Tracking Ref"
+            }
+          },
+          "required": [
+            "name",
+            "commit",
+            "current"
+          ],
+          "title": "GitBranch",
+          "type": "object"
+        },
+        "GitBranchesData": {
+          "additionalProperties": false,
+          "properties": {
+            "branches": {
+              "items": {
+                "$ref": "#/$defs/GitBranch"
+              },
+              "title": "Branches",
+              "type": "array"
+            }
+          },
+          "required": [
+            "branches"
+          ],
+          "title": "GitBranchesData",
+          "type": "object"
+        },
+        "ToolError": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ToolError",
+          "type": "object"
+        },
+        "Warning": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "Warning",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "partial",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitBranchesData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "omitted_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Count"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Reply[GitBranchesData]",
+      "type": "object"
+    }
+  },
+  "git_log": {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 100,
+          "maximum": 200,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        },
+        "repository": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Repository",
+          "type": "string"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        }
+      },
+      "required": [
+        "repository"
+      ],
+      "title": "GitLogArgs",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "GitCommit": {
+          "additionalProperties": false,
+          "properties": {
+            "commit": {
+              "title": "Commit",
+              "type": "string"
+            },
+            "subject": {
+              "title": "Subject",
+              "type": "string"
+            },
+            "author": {
+              "title": "Author",
+              "type": "string"
+            },
+            "authored_at": {
+              "title": "Authored At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "commit",
+            "subject",
+            "author",
+            "authored_at"
+          ],
+          "title": "GitCommit",
+          "type": "object"
+        },
+        "GitLogData": {
+          "additionalProperties": false,
+          "properties": {
+            "commits": {
+              "items": {
+                "$ref": "#/$defs/GitCommit"
+              },
+              "title": "Commits",
+              "type": "array"
+            }
+          },
+          "required": [
+            "commits"
+          ],
+          "title": "GitLogData",
+          "type": "object"
+        },
+        "ToolError": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ToolError",
+          "type": "object"
+        },
+        "Warning": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "Warning",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "partial",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitLogData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "omitted_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Count"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Reply[GitLogData]",
+      "type": "object"
+    }
+  },
+  "processes_list": {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 100,
+          "maximum": 200,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "pid": {
+          "anyOf": [
+            {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pid"
+        }
+      },
+      "title": "ProcessesListArgs",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "ProcessRow": {
+          "additionalProperties": false,
+          "properties": {
+            "pid": {
+              "title": "Pid",
+              "type": "integer"
+            },
+            "created_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Created At"
+            },
+            "ppid": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Ppid"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Name"
+            },
+            "state": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "State"
+            },
+            "cpu_percent": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Cpu Percent"
+            },
+            "memory_rss_bytes": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Memory Rss Bytes"
+            }
+          },
+          "required": [
+            "pid",
+            "created_at"
+          ],
+          "title": "ProcessRow",
+          "type": "object"
+        },
+        "ProcessesData": {
+          "additionalProperties": false,
+          "properties": {
+            "processes": {
+              "items": {
+                "$ref": "#/$defs/ProcessRow"
+              },
+              "title": "Processes",
+              "type": "array"
+            },
+            "cpu_sample_seconds": {
+              "default": 0.1,
+              "title": "Cpu Sample Seconds",
+              "type": "number"
+            }
+          },
+          "required": [
+            "processes"
+          ],
+          "title": "ProcessesData",
+          "type": "object"
+        },
+        "ToolError": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ToolError",
+          "type": "object"
+        },
+        "Warning": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "Warning",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "partial",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProcessesData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "omitted_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Count"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Reply[ProcessesData]",
+      "type": "object"
+    }
+  },
+  "ports_list": {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 100,
+          "maximum": 200,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        },
+        "port": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Port"
+        },
+        "protocol": {
+          "anyOf": [
+            {
+              "enum": [
+                "tcp",
+                "udp"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Protocol"
+        },
+        "pid": {
+          "anyOf": [
+            {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pid"
+        }
+      },
+      "title": "PortsListArgs",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "PortsData": {
+          "additionalProperties": false,
+          "properties": {
+            "sockets": {
+              "items": {
+                "$ref": "#/$defs/SocketRow"
+              },
+              "title": "Sockets",
+              "type": "array"
+            }
+          },
+          "required": [
+            "sockets"
+          ],
+          "title": "PortsData",
+          "type": "object"
+        },
+        "SocketRow": {
+          "additionalProperties": false,
+          "properties": {
+            "address": {
+              "title": "Address",
+              "type": "string"
+            },
+            "family": {
+              "enum": [
+                "ipv4",
+                "ipv6"
+              ],
+              "title": "Family",
+              "type": "string"
+            },
+            "port": {
+              "title": "Port",
+              "type": "integer"
+            },
+            "protocol": {
+              "enum": [
+                "tcp",
+                "udp"
+              ],
+              "title": "Protocol",
+              "type": "string"
+            },
+            "state": {
+              "enum": [
+                "listen",
+                "bound"
+              ],
+              "title": "State",
+              "type": "string"
+            },
+            "pid": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pid"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name"
+            }
+          },
+          "required": [
+            "address",
+            "family",
+            "port",
+            "protocol",
+            "state",
+            "pid",
+            "name"
+          ],
+          "title": "SocketRow",
+          "type": "object"
+        },
+        "ToolError": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ToolError",
+          "type": "object"
+        },
+        "Warning": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "Warning",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "partial",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PortsData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "omitted_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Count"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Reply[PortsData]",
+      "type": "object"
+    }
+  },
+  "system_stats": {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "disk_path": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Disk Path"
+        }
+      },
+      "title": "SystemStatsArgs",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "SystemData": {
+          "additionalProperties": false,
+          "properties": {
+            "cpu_percent": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Cpu Percent"
+            },
+            "cpu_sample_seconds": {
+              "default": 0.1,
+              "title": "Cpu Sample Seconds",
+              "type": "number"
+            },
+            "memory_total_bytes": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Memory Total Bytes"
+            },
+            "memory_available_bytes": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Memory Available Bytes"
+            },
+            "memory_used_bytes": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Memory Used Bytes"
+            },
+            "swap_total_bytes": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Swap Total Bytes"
+            },
+            "swap_used_bytes": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Swap Used Bytes"
+            },
+            "disk_total_bytes": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Disk Total Bytes"
+            },
+            "disk_used_bytes": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Disk Used Bytes"
+            },
+            "disk_free_bytes": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Disk Free Bytes"
+            },
+            "disk_path": {
+              "title": "Disk Path",
+              "type": "string"
+            }
+          },
+          "required": [
+            "disk_path"
+          ],
+          "title": "SystemData",
+          "type": "object"
+        },
+        "ToolError": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ToolError",
+          "type": "object"
+        },
+        "Warning": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "Warning",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "partial",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SystemData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "omitted_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Count"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Reply[SystemData]",
+      "type": "object"
+    }
+  },
+  "files_list": {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 100,
+          "maximum": 200,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        },
+        "directory": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Directory",
+          "type": "string"
+        },
+        "glob": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Glob"
+        },
+        "recursive": {
+          "default": false,
+          "title": "Recursive",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "directory"
+      ],
+      "title": "FilesListArgs",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "FileEntry": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "title": "Path",
+              "type": "string"
+            },
+            "type": {
+              "title": "Type",
+              "type": "string"
+            },
+            "size_bytes": {
+              "title": "Size Bytes",
+              "type": "integer"
+            },
+            "modified_at": {
+              "title": "Modified At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "type",
+            "size_bytes",
+            "modified_at"
+          ],
+          "title": "FileEntry",
+          "type": "object"
+        },
+        "FilesListData": {
+          "additionalProperties": false,
+          "properties": {
+            "entries": {
+              "items": {
+                "$ref": "#/$defs/FileEntry"
+              },
+              "title": "Entries",
+              "type": "array"
+            }
+          },
+          "required": [
+            "entries"
+          ],
+          "title": "FilesListData",
+          "type": "object"
+        },
+        "ToolError": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ToolError",
+          "type": "object"
+        },
+        "Warning": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "Warning",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "partial",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FilesListData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "omitted_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Count"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Reply[FilesListData]",
+      "type": "object"
+    }
+  },
+  "files_read": {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "start_line": {
+          "default": 1,
+          "maximum": 2147483647,
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        },
+        "max_lines": {
+          "default": 200,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Max Lines",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "FilesReadArgs",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "FileLine": {
+          "additionalProperties": false,
+          "properties": {
+            "line": {
+              "title": "Line",
+              "type": "integer"
+            },
+            "text": {
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "text"
+          ],
+          "title": "FileLine",
+          "type": "object"
+        },
+        "FilesReadData": {
+          "additionalProperties": false,
+          "properties": {
+            "lines": {
+              "items": {
+                "$ref": "#/$defs/FileLine"
+              },
+              "title": "Lines",
+              "type": "array"
+            }
+          },
+          "required": [
+            "lines"
+          ],
+          "title": "FilesReadData",
+          "type": "object"
+        },
+        "ToolError": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ToolError",
+          "type": "object"
+        },
+        "Warning": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "Warning",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "partial",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FilesReadData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "omitted_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Count"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Reply[FilesReadData]",
+      "type": "object"
+    }
+  },
+  "files_search": {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 100,
+          "maximum": 200,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        },
+        "directory": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Directory",
+          "type": "string"
+        },
+        "glob": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Glob"
+        },
+        "query": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        }
+      },
+      "required": [
+        "directory",
+        "query"
+      ],
+      "title": "FilesSearchArgs",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "FileMatch": {
+          "additionalProperties": false,
+          "properties": {
+            "line": {
+              "title": "Line",
+              "type": "integer"
+            },
+            "text": {
+              "title": "Text",
+              "type": "string"
+            },
+            "path": {
+              "title": "Path",
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "text",
+            "path"
+          ],
+          "title": "FileMatch",
+          "type": "object"
+        },
+        "FilesSearchData": {
+          "additionalProperties": false,
+          "properties": {
+            "matches": {
+              "items": {
+                "$ref": "#/$defs/FileMatch"
+              },
+              "title": "Matches",
+              "type": "array"
+            }
+          },
+          "required": [
+            "matches"
+          ],
+          "title": "FilesSearchData",
+          "type": "object"
+        },
+        "ToolError": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ToolError",
+          "type": "object"
+        },
+        "Warning": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "Warning",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "partial",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FilesSearchData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "omitted_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Count"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Reply[FilesSearchData]",
+      "type": "object"
+    }
+  },
+  "environment_info": {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "EnvironmentArgs",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "Capability": {
+          "additionalProperties": false,
+          "properties": {
+            "available": {
+              "title": "Available",
+              "type": "boolean"
+            },
+            "evidence": {
+              "title": "Evidence",
+              "type": "string"
+            }
+          },
+          "required": [
+            "available",
+            "evidence"
+          ],
+          "title": "Capability",
+          "type": "object"
+        },
+        "EnvironmentData": {
+          "additionalProperties": false,
+          "properties": {
+            "operating_system": {
+              "title": "Operating System",
+              "type": "string"
+            },
+            "python_version": {
+              "title": "Python Version",
+              "type": "string"
+            },
+            "capabilities": {
+              "additionalProperties": {
+                "$ref": "#/$defs/Capability"
+              },
+              "title": "Capabilities",
+              "type": "object"
+            },
+            "limits": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "title": "Limits",
+              "type": "object"
+            },
+            "server_version": {
+              "title": "Server Version",
+              "type": "string"
+            }
+          },
+          "required": [
+            "operating_system",
+            "python_version",
+            "capabilities",
+            "limits",
+            "server_version"
+          ],
+          "title": "EnvironmentData",
+          "type": "object"
+        },
+        "ToolError": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ToolError",
+          "type": "object"
+        },
+        "Warning": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "ACCESS_DENIED",
+                "SECRET_BLOCKED",
+                "DEPENDENCY_MISSING",
+                "UNAVAILABLE",
+                "UNSUPPORTED",
+                "INVALID_ARGUMENT",
+                "NOT_FOUND",
+                "TIMEOUT",
+                "OUTPUT_LIMIT",
+                "BUSY"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "Warning",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "partial",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EnvironmentData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "redacted": {
+          "default": false,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "omitted_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Count"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Reply[EnvironmentData]",
+      "type": "object"
+    }
+  }
+}
