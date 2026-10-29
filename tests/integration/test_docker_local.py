@@ -102,5 +102,9 @@ def test_owned_container_state_and_logs(tmp_path, inspection_context, request):
         logs = docker_logs(DockerLogsArgs(container_id=container_id), inspection_context)
         assert "ready" in logs.data.text
         assert "fixture-secret" not in logs.model_dump_json()
+        assert command("stop", "--time", "1", container_id).returncode == 0
+        stopped = docker_inspect(DockerInspectArgs(container_id=container_id), inspection_context)
+        assert stopped.data.running is False
+        assert stopped.data.status == "exited"
     finally:
         assert command("rm", "--force", container_id).returncode == 0

@@ -29,3 +29,11 @@ jobs:
         run: uv run --frozen pytest -m "not docker" -q --tb=short
       - if: ${{ hashFiles('pyproject.toml') != '' }}
         run: uv run --frozen ruff check src tests
+      - name: Live Docker acceptance (Linux)
+        if: ${{ matrix.os == 'ubuntu-latest' && hashFiles('pyproject.toml') != '' }}
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/devtools-docker"
+          docker --config "$RUNNER_TEMP/devtools-docker" version --format '{{.Server.Version}}'
+          docker --config "$RUNNER_TEMP/devtools-docker" pull busybox:stable
+          uv run --frozen pytest tests/integration/test_docker_local.py -m docker -q -rs --tb=short
