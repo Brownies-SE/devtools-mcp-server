@@ -11,8 +11,8 @@
 
 # Project context
 
-- Implement the reviewed specification in `docs/superpowers/specs/2026-10-28-devtools-mcp-server-design.md`.
-- Follow the implementation plan in `docs/superpowers/plans/2026-10-28-devtools-mcp-server.md`.
+- Implement the reviewed specification in `docs/superpowers/specs/2026-10-28-git-mcp-server-design.md`.
+- Follow the implementation plan in `docs/superpowers/plans/2026-10-28-git-mcp-server.md`.
 - Target standard Python 3.14 on Windows, macOS, and Linux.
-- The server is local, uses MCP stdio, exposes inspection tools only, and must exclude known secret sources.
+- The server is local, uses MCP stdio, exposes exactly six read-only Git tools, and must exclude known secret sources.
 - Do not add machine Python installation instructions to the specification.
