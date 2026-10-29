@@ -449,21 +449,26 @@ class GitReadView:
         except InspectionError:
             return False
 
-    def working(self, relative):
-        resolved, aliases = self.policy._canonical(str(self.worktree / relative))
-        proof = self.policy._open(resolved, aliases, self.ctx)
-        with VerifiedTextFile(proof, self.ctx) as source:
-            raw = source.read_bytes()
-            executable = bool(source.proof.initial.st_mode & 0o111)
+    def working(self, relative, indexed_mode):
+        from ..platforms.posix import map_os_error
+
+        try:
+            resolved, aliases = self.policy._canonical(str(self.worktree / relative))
+            proof = self.policy._open(resolved, aliases, self.ctx)
+            with VerifiedTextFile(proof, self.ctx) as source:
+                raw = source.read_bytes()
+                executable = bool(source.proof.initial.st_mode & 0o111)
+        except FileNotFoundError:
+            raise
+        except OSError as error:
+            raise map_os_error(error) from None
         oid = hashlib.new(
             self.object_format, b"blob " + str(len(raw)).encode() + b"\0" + raw
         ).hexdigest()
-        return ObjectEntry(
-            "100755"
-            if executable and self.config.get("core.filemode", "false") == "true"
-            else "100644",
-            oid,
-        ), raw
+        mode = indexed_mode
+        if self.config.get("core.filemode", "false").lower() in {"true", "yes", "on", "1", ""}:
+            mode = "100755" if executable else "100644"
+        return ObjectEntry(mode, oid), raw
 
     def untracked(self, index):
         if self.maybe(self.common, "info/attributes"):
@@ -515,7 +520,7 @@ class GitReadView:
                             target = self.ignore_tree / name
                             target.parent.mkdir(parents=True, exist_ok=True)
                             target.write_text(content, encoding="utf-8", newline="\n")
-                        if entry.type in {"file", "directory"}:
+                        if entry.type in {"file", "directory", "symlink"}:
                             names[name] = entry
                     ignored = set()
                     keys = list(names)
@@ -587,7 +592,7 @@ def git_status(args: GitStatusArgs, ctx) -> Reply[GitStatusData]:
                 view.warning()
                 continue
             try:
-                working, _ = view.working(path)
+                working, _ = view.working(path, item.mode)
                 if working != item:
                     unstaged.append(path)
             except FileNotFoundError:
@@ -787,7 +792,7 @@ def _compare(args: GitDiffArgs, ctx, *, patches: bool):
                     )
                     continue
                 try:
-                    new[path], working_raw[path] = view.working(path)
+                    new[path], working_raw[path] = view.working(path, item.mode)
                 except FileNotFoundError:
                     new.pop(path, None)
                 except InspectionError as error:
@@ -831,7 +836,7 @@ def _compare(args: GitDiffArgs, ctx, *, patches: bool):
                     else "renamed"
                     if old_path != new_path
                     else "type_changed"
-                    if before.mode != after.mode
+                    if before.mode[:3] != after.mode[:3]
                     else "modified"
                 )
                 files.append(GitChangedFile(old_path=old_path, new_path=new_path, status=status))
